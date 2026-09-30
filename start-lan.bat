@@ -21,4 +21,8 @@ REM Zero-config local DNS: advertise http://opensend.local on the LAN (mDNS).
 REM Runs in the background of this window; closes with it. Needs UDP 5353
 REM allowed once: New-NetFirewallRule -DisplayName "mDNS (UDP 5353)" -Direction Inbound -Protocol UDP -LocalPort 5353 -Action Allow -Profile Private
 start /b node scripts\mdns.mjs
+REM Built-in fallback DNS server (open-send.btec). Only starts if port 53 is free.
+REM If Technitium DNS Server is installed (recommended), it owns port 53 instead —
+REM use its web console http://localhost:5380 to add the open-send.btec zone.
+REM Manual start when needed: node scripts\dns.mjs
 call npm run start
