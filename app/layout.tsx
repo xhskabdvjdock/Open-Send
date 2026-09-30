@@ -29,7 +29,15 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl" className={arabicFallback.variable}>
+    <html lang="ar" dir="rtl" data-theme="dark" className={arabicFallback.variable}>
+      <head>
+        {/* Apply saved theme before paint to avoid a light flash (dark is default). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('opensend-theme');document.documentElement.dataset.theme=(t==='light'||t==='dark')?t:'dark';}catch(e){document.documentElement.dataset.theme='dark';}})();`,
+          }}
+        />
+      </head>
       <body>
         <LanguageProvider>
           <ThemeProvider>

@@ -1,42 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { Home, Send, Inbox, FolderUp, Bell, User, LogOut, SendHorizonal } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Home, Send, Inbox, FolderUp, Bell, User, Settings as SettingsIcon, SendHorizonal } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { LanguageSwitcher, useT } from '@/lib/i18n';
-import { ThemeToggle } from '@/lib/theme';
-
-interface Me {
-  id: string;
-  username: string;
-  displayName: string;
-  classId: string | null;
-  className: string | null;
-}
+import { useT } from '@/lib/i18n';
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { t } = useT();
-  const [me, setMe] = useState<Me | null>(null);
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     let alive = true;
     async function load() {
-      try {
-        const r = await fetch('/api/auth/me', { cache: 'no-store' });
-        if (!alive) return;
-        if (r.ok) {
-          const j = await r.json();
-          setMe(j.user);
-        } else {
-          setMe(null);
-        }
-      } catch {
-        /* offline */
-      }
       try {
         const n = await fetch('/api/notifications/unread-count', { cache: 'no-store' });
         if (n.ok && alive) {
@@ -57,12 +34,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const isAdminArea = pathname.startsWith('/webadmin');
   // NOTE: /webadmin is intentionally never linked from student UI.
 
-  async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-    router.refresh();
-  }
-
   const links = [
     { href: '/', label: t('home'), icon: <Home size={18} /> },
     { href: '/send', label: t('send'), icon: <Send size={18} /> },
@@ -70,7 +41,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
     { href: '/sent', label: t('sent'), icon: <FolderUp size={18} /> },
     { href: '/notifications', label: t('notifications'), icon: <Bell size={18} />, badge: unread },
     { href: '/profile', label: t('profile'), icon: <User size={18} /> },
+    { href: '/settings', label: t('settings'), icon: <SettingsIcon size={18} /> },
   ];
+  // Mobile bottom bar stays compact: profile lives inside the Settings page.
+  const mobileLinks = links.filter((l) => l.href !== '/profile');
 
   return (
     <>
@@ -94,13 +68,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   {typeof l.badge === 'number' && l.badge > 0 && <span className="badge-count">{l.badge > 99 ? '99+' : l.badge}</span>}
                 </Link>
               ))}
-            <ThemeToggle />
-            <LanguageSwitcher />
-            {me && !isAuthPage && !isAdminArea && (
-              <button className="btn btn-sm btn-ghost" onClick={logout} title={t('logout')}>
-                <LogOut size={16} /> <span className="hide-mobile">{t('logout')}</span>
-              </button>
-            )}
           </nav>
         </div>
         <style>{`@media (max-width: 859px){ .hide-mobile{ display:none; } .nav a{ padding:9px 10px; } }`}</style>
@@ -108,7 +75,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <main className="container page">{children}</main>
       {!isAuthPage && !isAdminArea && (
         <nav className="bottom-nav" aria-label="Mobile">
-          {links.map((l) => (
+          {mobileLinks.map((l) => (
             <Link key={l.href} href={l.href} className={pathname === l.href ? 'active' : ''}>
               {l.icon}
               {l.label}

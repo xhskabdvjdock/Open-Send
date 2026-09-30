@@ -6,15 +6,16 @@ import { useT } from '@/lib/i18n';
 
 export type Theme = 'light' | 'dark';
 
-const Ctx = createContext<{ theme: Theme; toggle: () => void }>({ theme: 'light', toggle: () => {} });
+const Ctx = createContext<{ theme: Theme; toggle: () => void }>({ theme: 'dark', toggle: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light');
+  // Dark is the default theme for new visitors.
+  const [theme, setTheme] = useState<Theme>('dark');
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('opensend-theme') as Theme | null;
-      const initial = saved === 'dark' || saved === 'light' ? saved : 'light';
+      const initial = saved === 'dark' || saved === 'light' ? saved : 'dark';
       setTheme(initial);
       document.documentElement.dataset.theme = initial;
     } catch {}
