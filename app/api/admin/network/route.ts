@@ -8,7 +8,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   const g = await requireAdmin(req);
   if ('errorResponse' in g) return g.errorResponse;
-  const port = Number(process.env.PORT || 3000);
+  // Detect the real port from the incoming request (works for :80 and :3000).
+  const urlPort = Number(new URL(req.url).port);
+  const port = Number.isFinite(urlPort) && urlPort > 0 ? urlPort : Number(process.env.PORT || 80);
   const urls = getLanUrls(port);
   return json({
     port,

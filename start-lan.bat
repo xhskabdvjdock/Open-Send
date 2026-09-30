@@ -10,8 +10,10 @@ if not exist .next (
   call npm run build
 )
 echo.
-echo Open Send is starting for the local network...
-echo Students open: http://YOUR-SERVER-IP:3000
-echo Admin (hidden): http://YOUR-SERVER-IP:3000/webadmin
+echo Open Send is starting for the local network (port 80, no :port needed)...
+echo Students open: http://YOUR-SERVER-IP
+echo Admin (hidden): http://YOUR-SERVER-IP/webadmin
+echo.
+echo If port 80 is busy, run: npm run start:3000
 echo.
 call npm run start

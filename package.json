@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 3000",
-    "start:lan": "next start -H 0.0.0.0 -p 3000",
+    "start": "next start -H 0.0.0.0 -p 80",
+    "start:lan": "next start -H 0.0.0.0 -p 80",
+    "start:3000": "next start -H 0.0.0.0 -p 3000",
     "lint": "next lint"
   },
   "dependencies": {
