@@ -80,7 +80,7 @@ export default function ReceivedPage() {
               {t('from')}: {x.senderName} · {x.senderClass || '—'} · @{x.senderUsername}
             </div>
             <div className="small muted">{formatBytes(x.totalBytes)} · {new Date(x.createdAt).toLocaleString()}</div>
-            {x.status === 'PENDING' && <div className="small mt" style={{ color: 'var(--warn)' }}>{t('waitingApproval')}</div>}
+            {x.status === 'PENDING' && <div className="small mt warn-text">{t('waitingApproval')}</div>}
           </Link>
         ))}
       </div>

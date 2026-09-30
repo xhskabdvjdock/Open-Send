@@ -55,7 +55,7 @@ export default function NotificationsPage() {
       <div className="grid mt">
         {items.length === 0 && <div className="card"><Empty icon={<Bell size={26} />} title={t('noNotifications')} hint={t('noNotificationsHint')} /></div>}
         {items.map((n) => (
-          <div key={n.id} className="card" style={{ borderColor: n.isRead ? undefined : '#93c5fd' }}>
+          <div key={n.id} className={n.isRead ? 'card' : 'card card-unread'}>
             <div className="space">
               <b>{n.title}</b>
               {!n.isRead && <span className="status status-accepted">{t('unread')}</span>}
