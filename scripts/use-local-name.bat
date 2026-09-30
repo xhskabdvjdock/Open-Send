@@ -41,5 +41,5 @@ if %errorlevel%==0 (
 ipconfig /flushdns >nul
 echo.
 echo Done. Open in this PC browser: http://!DOMAIN!
-echo (Phones are NOT affected — they use the IP or opensend.local)
+echo (Phones are NOT affected - they use the IP or opensend.local)
 pause
