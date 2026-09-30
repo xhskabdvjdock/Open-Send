@@ -162,8 +162,11 @@ New-NetFirewallRule -DisplayName "mDNS (UDP 5353)" -Direction Inbound -Protocol 
 1. **Technitium DNS Server (موصى به إن كان مثبّتاً):** يملك البورت 53 تلقائياً.
    افتح `http://localhost:5380` ← Zones ← Add ← Primary Zone باسم `open-send.btec`
    ثم أضف سجل A فارغ الاسم بقيمة عنوان الواي فاي (مثلاً `192.168.100.169`).
-2. **السيرفر المدمج في المشروع (`scripts/dns.mjs`):** بديل خفيف بلا تثبيت —
-   يعمل فقط إذا كان البورت 53 حرّاً (أي بدون Technitium). شغّله يدوياً بـ
+2. **Acrylic DNS Proxy (خفيف، ملف واحد):** ثبّته من https://mayakron.altervista.org
+   ثم شغّل `scripts\acrylic-setup.bat` كمسؤول — يوقف Technitium (لتحرير البورت 53)،
+   ويربط Acrylic بكل الواجهات، ويسمح لشبكتك، ويضيف `open-send.btec`، ويفتح جدار الحماية، ويختبر.
+3. **السيرفر المدمج في المشروع (`scripts/dns.mjs`):** بديل بلا تثبيت —
+   يعمل فقط إذا كان البورت 53 حرّاً (أي بدون Technitium/Acrylic). شغّله يدوياً بـ
    `node scripts/dns.mjs` — يجيب عن `open-send.btec` ويمرّر باقي المواقع للإنترنت.
 
 في الحالتين: باقي الأجهزة يجب أن **تستخدم هذا البيسي كـ DNS** (مرة واحدة من الراوتر عبر DHCP،
