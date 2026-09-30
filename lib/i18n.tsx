@@ -306,7 +306,7 @@ const dict = {
     registerTitle: 'أنشئ حسابك',
     registerSub: 'اسأل معلمك عن صفّك إذا لم تكن متأكداً',
     registrationDisabled: 'التسجيل معطّل حالياً. يرجى التواصل مع الإدارة.',
-    maintenanceTitle: 'أوبن سند غير متاح مؤقتاً.',
+    maintenanceTitle: 'Open Send غير متاح مؤقتاً.',
     maintenanceSub: 'يرجى المحاولة لاحقاً.',
     totalSize: 'الحجم الكلي',
     Login: 'تسجيل الدخول',
