@@ -8,7 +8,7 @@ import { useT } from '@/lib/i18n';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { t } = useT();
+  const { t, te } = useT();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,13 +26,13 @@ export default function LoginPage() {
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
-        setError(j.error || 'Login failed.');
+        setError(j.error ? te(j.error) : t('errFailed'));
         return;
       }
       router.push('/');
       router.refresh();
     } catch {
-      setError('Server offline. Make sure you are on the school Wi-Fi.');
+      setError(t('errOffline'));
     } finally {
       setBusy(false);
     }

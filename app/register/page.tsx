@@ -10,7 +10,7 @@ interface ClassItem { id: string; name: string }
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { t } = useT();
+  const { t, te } = useT();
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [form, setForm] = useState({ username: '', password: '', confirmPassword: '', displayName: '', classId: '' });
@@ -34,7 +34,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('errPwMatch'));
       return;
     }
     setBusy(true);
@@ -46,13 +46,13 @@ export default function RegisterPage() {
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
-        setError(j.error || 'Registration failed.');
+        setError(j.error ? te(j.error) : t('errFailed'));
         return;
       }
       router.push('/');
       router.refresh();
     } catch {
-      setError('Server offline.');
+      setError(t('errOffline'));
     } finally {
       setBusy(false);
     }

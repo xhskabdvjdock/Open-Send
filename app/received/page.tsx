@@ -73,7 +73,7 @@ export default function ReceivedPage() {
         ) : items.map((x) => (
           <Link key={x.id} href={`/transfers/${x.id}`} className="card" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div className="space">
-              <b className="ellipsis">{x.fileCount > 1 ? `${x.fileCount} files` : x.firstFileName || 'Files'}</b>
+              <b className="ellipsis">{x.fileCount > 1 ? `${x.fileCount} ${t('filesCount')}` : x.firstFileName || t('files')}</b>
               <StatusBadge status={x.status} />
             </div>
             <div className="small muted mt">

@@ -13,7 +13,7 @@ interface Person { id: string; username: string; displayName: string; className:
 
 export default function TransferDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { t } = useT();
+  const { t, te } = useT();
   const [data, setData] = useState<{
     transfer: { id: string; status: string; message: string; createdAt: string; expiresAt: string | null; downloadCount: number };
     files: DetailFile[];
@@ -37,12 +37,12 @@ export default function TransferDetailPage({ params }: { params: { id: string } 
       }
       const j = await r.json();
       if (!r.ok) {
-        setError(j.error || 'Not found.');
+        setError(j.error ? te(j.error) : t('errFailed'));
         return;
       }
       setData(j);
     } catch {
-      setError('Server offline.');
+      setError(t('errOffline'));
     } finally {
       setLoading(false);
     }
@@ -59,12 +59,12 @@ export default function TransferDetailPage({ params }: { params: { id: string } 
       const r = await fetch(`/api/transfers/${params.id}/${kind}`, { method: 'POST' });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
-        setError(j.error || 'Action failed.');
+        setError(j.error ? te(j.error) : t('errFailed'));
         return;
       }
       await load();
     } catch {
-      setError('Server offline.');
+      setError(t('errOffline'));
     } finally {
       setBusy('');
     }

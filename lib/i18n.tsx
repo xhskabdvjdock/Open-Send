@@ -236,6 +236,66 @@ const dict = {
     syCurrent: 'Current',
     syNew: 'New (min 8)',
     syChange: 'Change',
+    dlgConfirm: 'Confirm',
+    dlgCancel: 'Cancel',
+    errOffline: 'Server offline. Make sure you are on the school network.',
+    errFailed: 'Failed.',
+    errBadRequest: 'Invalid request.',
+    errUserShort: 'Username is too short (min 3 characters).',
+    errUserLong: 'Username is too long (max 32 characters).',
+    errUserChars: 'Username: letters, numbers and . _ - only.',
+    errPwShort: 'Password is too short (min 6 characters).',
+    errPwLong: 'Password is too long.',
+    errPwMatch: 'Passwords do not match.',
+    errNameReq: 'Display name is required (min 2 characters).',
+    errClassReq: 'Class is required.',
+    errClassInvalid: 'Selected class is invalid.',
+    errTaken: 'Username is already taken.',
+    errCreds: 'Invalid credentials.',
+    errDisabled: 'This account is disabled. Please contact the administrator.',
+    errRate: 'Too many attempts. Please try again later.',
+    errLoginReq: 'Username and password are required.',
+    errCurPw: 'Current password is incorrect.',
+    errNoRecipient: 'Please select a recipient.',
+    errSelf: 'You cannot send files to yourself.',
+    errNoFile: 'Please choose at least one file.',
+    errTooMany: 'Too many files for one transfer.',
+    errTooBig: 'A file exceeds the maximum size.',
+    errBlocked: 'This file type is blocked by the administrator.',
+    errNotAllowedExt: 'This file type is not allowed.',
+    errEmptyFile: 'The file is empty.',
+    errUnreadable: 'The file could not be read.',
+    errScope: 'Sending to this class is not allowed.',
+    errUploadFail: 'Upload failed. Please try again.',
+    errNotFound: 'Not found.',
+    errForbidden: 'You are not authorized.',
+    errUnauth: 'Session expired. Please log in again.',
+    errState: 'Transfer status changed. Please refresh.',
+    errExpired: 'This file has expired.',
+    errMustAccept: 'You must accept the file before downloading.',
+    errDlStatus: 'Download is not allowed in this status.',
+    errMultiDl: 'Multiple downloads are disabled by the administrator.',
+    errDlLimit: 'Download limit reached.',
+    errFileGone: 'File not found on the server.',
+    errClassChangeOff: 'Changing class is disabled by the administrator.',
+    errNothing: 'Nothing to update.',
+    errUnknownAction: 'Unknown action.',
+    errBackupFail: 'Backup failed.',
+    errRestoreFail: 'Restore failed.',
+    errBackupInvalid: 'Invalid backup file.',
+    errExists: 'Already exists.',
+    errInvalid: 'Invalid value.',
+    errRequiredField: 'A required field is missing.',
+    nfTitle: 'Page not found.',
+    nfSub: 'The page you are looking for does not exist.',
+    errTitle: 'Something went wrong.',
+    delStudentHint: 'Their transfers and files will be removed permanently.',
+    delClassMsg: 'Delete this class?',
+    delTransferMsg: 'Delete this transfer and its files permanently?',
+    delFileMsg: 'Delete this file?',
+    restoreMsg: 'Current data will be backed up first.',
+    needTarget: 'Choose a class to move the students to first.',
+    tmpPwPh: 'Temporary password (min 6 chars)',
   },
   ar: {
     brand: 'Open Send',
@@ -468,15 +528,182 @@ const dict = {
     syCurrent: 'الحالية',
     syNew: 'الجديدة (8 أحرف على الأقل)',
     syChange: 'تغيير',
+    dlgConfirm: 'تأكيد',
+    dlgCancel: 'تراجع',
+    errOffline: 'الخادم غير متصل. تأكد من اتصالك بشبكة المدرسة.',
+    errFailed: 'فشل.',
+    errBadRequest: 'طلب غير صالح.',
+    errUserShort: 'اسم المستخدم قصير (3 أحرف على الأقل).',
+    errUserLong: 'اسم المستخدم طويل (32 حرفاً كحد أقصى).',
+    errUserChars: 'اسم المستخدم: حروف وأرقام و . _ - فقط.',
+    errPwShort: 'كلمة المرور قصيرة (6 أحرف على الأقل).',
+    errPwLong: 'كلمة المرور طويلة جداً.',
+    errPwMatch: 'كلمتا المرور غير متطابقتين.',
+    errNameReq: 'الاسم المعروض مطلوب (حرفان على الأقل).',
+    errClassReq: 'الصف مطلوب.',
+    errClassInvalid: 'الصف المحدد غير صالح.',
+    errTaken: 'اسم المستخدم مسجّل مسبقاً.',
+    errCreds: 'بيانات الدخول غير صحيحة.',
+    errDisabled: 'هذا الحساب معطّل. تواصل مع الإدارة.',
+    errRate: 'محاولات كثيرة. حاول لاحقاً.',
+    errLoginReq: 'اسم المستخدم وكلمة المرور مطلوبان.',
+    errCurPw: 'كلمة المرور الحالية غير صحيحة.',
+    errNoRecipient: 'الرجاء اختيار مستلم.',
+    errSelf: 'لا يمكنك الإرسال لنفسك.',
+    errNoFile: 'الرجاء اختيار ملف واحد على الأقل.',
+    errTooMany: 'عدد الملفات يتجاوز الحد المسموح.',
+    errTooBig: 'ملف يتجاوز الحد الأقصى للحجم.',
+    errBlocked: 'نوع الملف محظور من الإدارة.',
+    errNotAllowedExt: 'نوع الملف غير مسموح.',
+    errEmptyFile: 'الملف فارغ.',
+    errUnreadable: 'تعذّر قراءة الملف.',
+    errScope: 'الإرسال لهذا الصف غير مسموح.',
+    errUploadFail: 'فشل الرفع. حاول مجدداً.',
+    errNotFound: 'غير موجود.',
+    errForbidden: 'غير مصرّح لك.',
+    errUnauth: 'انتهت الجلسة. سجّل الدخول مجدداً.',
+    errState: 'تغيّرت حالة التحويل. حدّث الصفحة.',
+    errExpired: 'انتهى هذا الملف.',
+    errMustAccept: 'يجب قبول الملف قبل التنزيل.',
+    errDlStatus: 'التنزيل غير مسموح بهذه الحالة.',
+    errMultiDl: 'التنزيلات المتعددة معطّلة من الإدارة.',
+    errDlLimit: 'بلغت حد التنزيلات.',
+    errFileGone: 'الملف غير موجود على الخادم.',
+    errClassChangeOff: 'تغيير الصف معطّل من الإدارة.',
+    errNothing: 'لا يوجد ما يُحدَّث.',
+    errUnknownAction: 'إجراء غير معروف.',
+    errBackupFail: 'فشل النسخ الاحتياطي.',
+    errRestoreFail: 'فشلت الاستعادة.',
+    errBackupInvalid: 'ملف النسخة غير صالح.',
+    errExists: 'موجود مسبقاً.',
+    errInvalid: 'قيمة غير صالحة.',
+    errRequiredField: 'حقل مطلوب ناقص.',
+    nfTitle: 'الصفحة غير موجودة.',
+    nfSub: 'الصفحة التي تبحث عنها غير موجودة.',
+    errTitle: 'حدث خطأ ما.',
+    delStudentHint: 'سيتم حذف تحويلاته وملفاته نهائياً.',
+    delClassMsg: 'حذف هذا الصف؟',
+    delTransferMsg: 'حذف هذا التحويل وملفاته نهائياً؟',
+    delFileMsg: 'حذف هذا الملف؟',
+    restoreMsg: 'سيتم نسخ البيانات الحالية احتياطياً أولاً.',
+    needTarget: 'اختر صفاً لنقل الطلاب إليه أولاً.',
+    tmpPwPh: 'كلمة مرور مؤقتة (6 أحرف على الأقل)',
   },
 } as const;
 
 export type TKey = keyof (typeof dict)['en'];
 
-const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void; t: (k: TKey) => string }>({ 
+// Maps server (English) messages to dictionary keys so that alerts,
+// warnings and errors always appear in the selected language.
+const exactErrorMap: Record<string, TKey> = {
+  'Registration is currently disabled. Please contact the administrator.': 'registrationDisabled',
+  'Open Send is temporarily unavailable.': 'maintenanceTitle',
+  'Invalid request body.': 'errBadRequest',
+  'Username must be at least 3 characters.': 'errUserShort',
+  'Username must be at most 32 characters.': 'errUserLong',
+  'Username may only contain letters, numbers, dot, dash and underscore.': 'errUserChars',
+  'Password must be at least 6 characters.': 'errPwShort',
+  'Password must be at least 8 characters.': 'errPwShort',
+  'Password is too long.': 'errPwLong',
+  'Passwords do not match.': 'errPwMatch',
+  'Display name is required (min 2 characters).': 'errNameReq',
+  'Display name is required.': 'errNameReq',
+  'Display name too short.': 'errNameReq',
+  'Class is required.': 'errClassReq',
+  'Selected class is invalid.': 'errClassInvalid',
+  'Invalid class.': 'errClassInvalid',
+  'Username is already taken.': 'errTaken',
+  'Class already exists.': 'errExists',
+  'Another class has this name.': 'errExists',
+  'Invalid username or password.': 'errCreds',
+  'Invalid admin credentials.': 'errCreds',
+  'This account is disabled. Please contact the administrator.': 'errDisabled',
+  'Too many attempts. Please try again later.': 'errRate',
+  'Username and password are required.': 'errLoginReq',
+  'Current password is incorrect.': 'errCurPw',
+  'Recipient is required.': 'errNoRecipient',
+  'Recipient not found.': 'errNotFound',
+  'Student not found.': 'errNotFound',
+  'Class not found.': 'errNotFound',
+  'Transfer not found.': 'errNotFound',
+  'File not found.': 'errNotFound',
+  'Backup not found.': 'errNotFound',
+  'You cannot send files to yourself.': 'errSelf',
+  'At least one file is required.': 'errNoFile',
+  'Upload failed. Please try again.': 'errUploadFail',
+  'Only the recipient can accept.': 'errForbidden',
+  'Only the recipient can decline.': 'errForbidden',
+  'Only the sender can cancel.': 'errForbidden',
+  'You are not authorized to download this file.': 'errForbidden',
+  'Unauthorized': 'errUnauth',
+  'Unauthorized: admin authentication required.': 'errUnauth',
+  'This file has expired.': 'errExpired',
+  'The recipient must accept the file before downloading.': 'errMustAccept',
+  'Multiple downloads are disabled by the administrator.': 'errMultiDl',
+  'Download limit reached.': 'errDlLimit',
+  'File not found on server.': 'errFileGone',
+  'Changing class is disabled by the administrator.': 'errClassChangeOff',
+  'Nothing to update.': 'errNothing',
+  'Unknown action. Use cancel or expire.': 'errUnknownAction',
+  'Backup failed.': 'errBackupFail',
+  'Restore failed.': 'errRestoreFail',
+  'Backup validation failed.': 'errBackupInvalid',
+  'Backup validation failed: not an Open Send database.': 'errBackupInvalid',
+  'Invalid backup file.': 'errBackupInvalid',
+  'Invalid reassign target.': 'errInvalid',
+  'Invalid sendScope.': 'errInvalid',
+  'Invalid classRestrictions JSON.': 'errInvalid',
+};
+
+// Ordered substring fallbacks (checked after exact match).
+const fuzzyErrorMap: [string, TKey][] = [
+  ['sending to', 'errScope'],
+  ['exceeds the', 'errTooBig'],
+  ['is blocked', 'errBlocked'],
+  ['is not allowed', 'errNotAllowedExt'],
+  ['maximum', 'errTooMany'],
+  ['already exists', 'errExists'],
+  ['already', 'errState'],
+  ['must accept', 'errMustAccept'],
+  ['download not allowed', 'errDlStatus'],
+  ['not authorized', 'errForbidden'],
+  ['request failed', 'errFailed'],
+  ['invalid', 'errInvalid'],
+  ['required', 'errRequiredField'],
+  ['not found', 'errNotFound'],
+  ['failed', 'errFailed'],
+];
+
+export function translateServerError(msg: string, lang: Lang): string {
+  if (!msg) return msg;
+  const table = dict[lang] as Record<string, string>;
+  const exact = exactErrorMap[msg];
+  if (exact && table[exact]) return table[exact];
+  const low = msg.toLowerCase();
+  for (const [sub, key] of fuzzyErrorMap) {
+    if (low.includes(sub) && table[key]) return table[key];
+  }
+  return msg;
+}
+
+function currentStoredLang(): Lang {
+  try {
+    const s = localStorage.getItem('opensend-lang');
+    return s === 'en' ? 'en' : 'ar';
+  } catch {
+    return 'ar';
+  }
+}
+
+export function translateError(msg: string): string {
+  return translateServerError(msg, currentStoredLang());
+}
+
+const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void; t: (k: TKey) => string; te: (msg: string) => string }>({ 
   lang: 'ar',
   setLang: () => {},
   t: (k) => k as string,
+  te: (msg) => msg as string,
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
@@ -507,10 +734,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return table[k] ?? (dict.en as Record<string, string>)[k] ?? k;
   };
 
-  return <Ctx.Provider value={{ lang, setLang, t }}>{children}</Ctx.Provider>;
+  const te = (msg: string): string => translateServerError(msg, lang);
+
+  return <Ctx.Provider value={{ lang, setLang, t, te }}>{children}</Ctx.Provider>;
 }
 
-export function useT(): { lang: Lang; setLang: (l: Lang) => void; t: (k: TKey) => string } {
+export function useT(): { lang: Lang; setLang: (l: Lang) => void; t: (k: TKey) => string; te: (msg: string) => string } {
   return useContext(Ctx);
 }
 

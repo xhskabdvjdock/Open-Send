@@ -310,3 +310,18 @@ html[data-theme="dark"] .admin-tabs button.active { background: #f5f5f5; color: 
 html[data-theme="dark"] .logo-big { background: #f5f5f5; color: #0d0d0d; }
 /* QR must stay black-on-white to remain scannable */
 html[data-theme="dark"] .qr-box { background: #fff; border-color: #fff; }
+
+/* ============ In-app dialogs (never window.confirm/prompt) ============ */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid; place-items: center; padding: 16px;
+}
+.modal-card {
+  background: var(--card); color: var(--text);
+  border: 2px solid var(--text); border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 20px; width: 100%; max-width: 430px;
+}
+.modal-card h3 { margin: 0 0 8px; }
+.modal-card p { margin: 0 0 6px; }

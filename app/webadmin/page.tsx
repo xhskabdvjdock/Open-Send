@@ -10,7 +10,8 @@ import {
   ScrollText, Server, LogOut, ShieldAlert, Plus, Pencil, Trash2, KeyRound, Upload, RefreshCw,
 } from 'lucide-react';
 import { formatBytes } from '@/lib/validation';
-import { useT, type TKey } from '@/lib/i18n';
+import { useT, type TKey, translateError } from '@/lib/i18n';
+import { useConfirm, usePrompt } from '@/components/dialogs';
 
 type Tab = 'overview' | 'students' | 'classes' | 'transfers' | 'storage' | 'settings' | 'logs' | 'system';
 
@@ -28,7 +29,7 @@ const TABS: { id: Tab; labelKey: TKey; icon: React.ReactNode }[] = [
 async function api(path: string, init?: RequestInit) {
   const r = await fetch(path, { cache: 'no-store', ...init });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
+  if (!r.ok) throw new Error(translateError(j.error || `Request failed (${r.status})`));
   return j;
 }
 
@@ -161,6 +162,8 @@ function Overview() {
 
 function Students() {
   const { t } = useT();
+  const { dialog: confirmDialog, ask: askConfirm } = useConfirm();
+  const { dialog: promptDialog, ask: askPrompt } = usePrompt();
   const [items, setItems] = useState<Record<string, string | number | null>[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [q, setQ] = useState('');
@@ -225,7 +228,8 @@ function Students() {
   }
 
   async function remove(id: string, username: string) {
-    if (!confirm(`حذف الطالب @${username}؟ سيتم حذف تحويلاته وملفاته.`)) return;
+    const ok = await askConfirm({ title: `@${username}`, message: t('delStudentHint'), okLabel: t('del'), danger: true });
+    if (!ok) return;
     try {
       await api(`/api/admin/students/${id}`, { method: 'DELETE' });
       load();
@@ -235,7 +239,7 @@ function Students() {
   }
 
   async function resetPw(id: string) {
-    const np = prompt('كلمة مرور مؤقتة جديدة (6 أحرف على الأقل):');
+    const np = await askPrompt({ title: t('changePassword'), placeholder: t('tmpPwPh'), okLabel: t('save'), minLength: 6, isPassword: true });
     if (!np) return;
     try {
       await api(`/api/admin/students/${id}/reset-password`, {
@@ -251,6 +255,8 @@ function Students() {
 
   return (
     <div className="grid">
+      {confirmDialog}
+      {promptDialog}
       {msg && <div className="card"><span className="small">{msg}</span></div>}
       <div className="card">
         <div className="row">
@@ -341,10 +347,12 @@ function Students() {
 
 function Classes() {
   const { t } = useT();
+  const { dialog: confirmDialog, ask: askConfirm } = useConfirm();
   const [items, setItems] = useState<{ id: string; name: string; enabled: number; studentCount: number }[]>([]);
   const [name, setName] = useState('');
   const [msg, setMsg] = useState('');
   const [rename, setRename] = useState('');
+  const [reassign, setReassign] = useState<Record<string, string>>({});
 
   async function load() {
     try {
@@ -386,9 +394,14 @@ function Classes() {
   }
 
   async function remove(id: string, count: number) {
+    if (count > 0 && !reassign[id]) {
+      setMsg(t('needTarget'));
+      return;
+    }
+    const ok = await askConfirm({ title: t('tabClasses'), message: t('delClassMsg'), okLabel: t('del'), danger: true });
+    if (!ok) return;
     if (count > 0) {
-      const target = prompt(`هذا الصف فيه ${count} طلاب. أدخل معرف الصف الهدف لنقلهم إليه، أو ألغِ:`);
-      if (!target) return;
+      const target = reassign[id];
       try {
         await fetch(`/api/admin/classes/${id}?reassignTo=${encodeURIComponent(target)}`, { method: 'DELETE' }).then(async (r) => {
           const j = await r.json();
@@ -396,11 +409,10 @@ function Classes() {
         });
         load();
       } catch (e) {
-        setMsg((e as Error).message);
+        setMsg(translateError((e as Error).message));
       }
       return;
     }
-    if (!confirm('حذف هذا الصف؟')) return;
     try {
       await api(`/api/admin/classes/${id}`, { method: 'DELETE' });
       load();
@@ -411,6 +423,7 @@ function Classes() {
 
   return (
     <div className="grid">
+      {confirmDialog}
       {msg && <div className="card"><span className="small">{msg}</span></div>}
       <div className="card">
         <form onSubmit={create} className="row">
@@ -426,6 +439,19 @@ function Classes() {
               <span className={`status ${c.enabled ? 'status-downloaded' : 'status-expired'}`}>{c.enabled ? t('clEnabled') : t('clDisabled')}</span>
             </div>
             <p className="muted small">{c.studentCount} {t('clStudents')} · ID: {c.id.slice(0, 8)}</p>
+            {c.studentCount > 0 && (
+              <select
+                className="select"
+                style={{ maxWidth: 220 }}
+                value={reassign[c.id] || ''}
+                onChange={(e) => setReassign({ ...reassign, [c.id]: e.target.value })}
+              >
+                <option value="">{t('needTarget')}</option>
+                {items.filter((x) => x.id !== c.id).map((x) => (
+                  <option key={x.id} value={x.id}>{x.name}</option>
+                ))}
+              </select>
+            )}
             <div className="row">
               <input className="input" style={{ maxWidth: 200 }} placeholder={t('clRename')} value={rename} onChange={(e) => setRename(e.target.value)} />
               <button className="btn btn-sm" onClick={() => doRename(c.id)}>{t('clRename')}</button>
@@ -441,6 +467,7 @@ function Classes() {
 
 function Transfers() {
   const { t } = useT();
+  const { dialog: confirmDialog, ask: askConfirm } = useConfirm();
   const [items, setItems] = useState<Record<string, string | number | null>[]>([]);
   const [f, setF] = useState({ sender: '', recipient: '', status: '', date: '', fileType: '' });
   const [msg, setMsg] = useState('');
@@ -471,7 +498,8 @@ function Transfers() {
   }
 
   async function del(id: string) {
-    if (!confirm('حذف هذا التحويل وملفاته نهائياً؟')) return;
+    const ok = await askConfirm({ title: t('tabTransfers'), message: t('delTransferMsg'), okLabel: t('del'), danger: true });
+    if (!ok) return;
     try {
       await api(`/api/admin/transfers/${id}`, { method: 'DELETE' });
       load();
@@ -491,7 +519,8 @@ function Transfers() {
   }
 
   async function delFile(fileId: string) {
-    if (!confirm('حذف هذا الملف؟')) return;
+    const ok = await askConfirm({ title: t('trFiles'), message: t('delFileMsg'), okLabel: t('del'), danger: true });
+    if (!ok) return;
     try {
       await api(`/api/admin/files/${fileId}`, { method: 'DELETE' });
       setDetail(null);
@@ -503,6 +532,7 @@ function Transfers() {
 
   return (
     <div className="grid">
+      {confirmDialog}
       {msg && <div className="card"><span className="small">{msg}</span></div>}
       <div className="card">
         <div className="row">
@@ -737,6 +767,7 @@ function Logs() {
 
 function System() {
   const { t } = useT();
+  const { dialog: confirmDialog, ask: askConfirm } = useConfirm();
   const [sys, setSys] = useState<Record<string, string | number> | null>(null);
   const [net, setNet] = useState<{ localUrl: string; lanUrls: string[]; primaryUrl: string; port: number; status: string } | null>(null);
   const [backups, setBackups] = useState<{ name: string; size: number; createdAt: string }[]>([]);
@@ -771,7 +802,8 @@ function System() {
   }
 
   async function restore(name: string) {
-    if (!confirm(`استعادة النسخة ${name}؟ سيتم نسخ البيانات الحالية احتياطياً أولاً.`)) return;
+    const ok = await askConfirm({ title: name, message: t('restoreMsg'), okLabel: t('syRestore'), danger: true });
+    if (!ok) return;
     try {
       await api('/api/admin/backup/restore', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: name }) });
       setMsg(t('saved'));
@@ -793,6 +825,7 @@ function System() {
 
   return (
     <div className="grid">
+      {confirmDialog}
       {msg && <div className="card"><span className="small">{msg}</span></div>}
       <div className="grid grid-2">
         <div className="card">

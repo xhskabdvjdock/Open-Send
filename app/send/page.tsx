@@ -11,7 +11,7 @@ interface ClassItem { id: string; name: string }
 
 export default function SendPage() {
   const router = useRouter();
-  const { t } = useT();
+  const { t, te } = useT();
   const [q, setQ] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -96,7 +96,7 @@ export default function SendPage() {
           setProgress(100);
           setTimeout(() => router.push('/sent'), 900);
         } else {
-          setError(j.error || 'Send failed.');
+          setError(j.error ? te(j.error) : t('errFailed'));
         }
       } catch {
         setError('Send failed.');
@@ -104,7 +104,7 @@ export default function SendPage() {
     };
     xhr.onerror = () => {
       setBusy(false);
-      setError('Server offline. Make sure you are on the school Wi-Fi.');
+      setError(t('errOffline'));
     };
     xhr.send(fd);
   }

@@ -8,7 +8,7 @@ import { Loading } from '@/components/feedback';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { t } = useT();
+  const { t, te } = useT();
   const [me, setMe] = useState<{ displayName: string; username: string; className: string | null; classId: string | null } | null>(null);
   const [allowClassChange, setAllowClassChange] = useState(false);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
@@ -50,7 +50,7 @@ export default function ProfilePage() {
       body: JSON.stringify({ displayName, ...(allowClassChange ? { classId } : {}) }),
     });
     const j = await r.json().catch(() => ({}));
-    setMsg(r.ok ? t('saved') : j.error || 'Failed.');
+    setMsg(r.ok ? t('saved') : j.error ? te(j.error) : t('errFailed'));
   }
 
   async function changePw(e: React.FormEvent) {
@@ -62,7 +62,7 @@ export default function ProfilePage() {
       body: JSON.stringify(pw),
     });
     const j = await r.json().catch(() => ({}));
-    setPwMsg(r.ok ? t('pwChanged') : j.error || 'Failed.');
+    setPwMsg(r.ok ? t('pwChanged') : j.error ? te(j.error) : t('errFailed'));
     if (r.ok) setPw({ currentPassword: '', newPassword: '' });
   }
 
