@@ -140,6 +140,20 @@ npm run start
    `http://192.168.100.169` (لاحظ `http` وليس `https`، وبدون أي بورت).
 4. أسهل طريقة للطلاب: امسح رمز QR من `/webadmin` ← النظام (اختر رابط الواي فاي من القائمة).
 
+### اسم محلي بدون أي إعدادات: `http://opensend.local`
+
+`start-lan.bat` يشغّل تلقائياً خدمة mDNS صغيرة (`scripts/mdns.mjs`) تعلن عن الاسم
+`opensend.local` في الشبكة — بلا سيرفر DNS، بلا راوتر، بلا تعديل أجهزة.
+iPhone يفهمه مباشرة، وأندرويد 12+ وWindows كذلك. يلزم فقط قاعدة جدار حماية واحدة
+(PowerShell كمسؤول، مرة واحدة):
+
+```powershell
+New-NetFirewallRule -DisplayName "mDNS (UDP 5353)" -Direction Inbound -Protocol UDP -LocalPort 5353 -Action Allow -Profile Private
+```
+
+ثم افتح من أي جهاز: `http://opensend.local` (البورت 80، فلا بورت في الرابط).
+ملاحظة: أندرويد أقدم من 12 قد لا يحل أسماء `.local` — استخدم عنوان IP مباشرة لتلك الأجهزة.
+
 ---
 
 ## 6. دليل الطالب
