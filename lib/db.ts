@@ -1,0 +1,248 @@
+import { DatabaseSync } from 'node:sqlite';
+import fs from 'node:fs';
+import { dataDir, dbPath, ensureDirs } from './paths';
+import { hashPassword, nowISO, newId } from './crypto';
+
+export type Db = DatabaseSync;
+
+type GlobalWithDb = typeof globalThis & { __opensendDb?: DatabaseSync };
+const g = globalThis as GlobalWithDb;
+
+const DEFAULT_CLASSES = [
+  'Grade 10 - A',
+  'Grade 10 - B',
+  'Grade 10 - C',
+  'Grade 11 - A',
+  'Grade 11 - B',
+  'Grade 11 - C',
+  'Grade 12 - A',
+  'Grade 12 - B',
+];
+
+export const DEFAULT_SETTINGS: Record<string, string> = {
+  appName: 'Open Send',
+  appVersion: '1.0.0',
+  registrationEnabled: 'true',
+  maintenanceMode: 'false',
+  allowClassChange: 'false',
+  maxFileSizeMB: '50',
+  maxFilesPerTransfer: '5',
+  allowedExtensions: '',
+  blockedExtensions: 'exe,bat,cmd,com,scr,msi,ps1,vbs,jar,apk,reg,dll,sys',
+  defaultExpiryHours: '168', // 7 days; 0 = never
+  allowMultipleDownloads: 'true',
+  maxDownloads: '0', // 0 = unlimited
+  sendScope: 'anyone', // anyone | same-class | selected
+  classRestrictions: '{}', // JSON: { [senderClassId]: [allowedClassId,...] }
+  retentionDeclinedDays: '7',
+  retentionCancelledDays: '7',
+  retentionExpiredDays: '3',
+  retentionCompletedDays: '30',
+  autoDeleteExpired: 'true',
+  adminCanPreview: 'false',
+};
+
+function migrate(db: DatabaseSync): void {
+  try {
+    db.exec('PRAGMA journal_mode = WAL;');
+  } catch {}
+  try {
+    db.exec('PRAGMA foreign_keys = ON;');
+  } catch {}
+  try {
+    db.exec('PRAGMA synchronous = NORMAL;');
+  } catch {}
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS classes (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      usernameLower TEXT NOT NULL UNIQUE,
+      displayName TEXT NOT NULL,
+      passwordHash TEXT NOT NULL,
+      classId TEXT REFERENCES classes(id) ON DELETE SET NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      createdAt TEXT NOT NULL,
+      lastLoginAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS admins (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      usernameLower TEXT NOT NULL UNIQUE,
+      passwordHash TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      tokenHash TEXT NOT NULL UNIQUE,
+      userId TEXT REFERENCES users(id) ON DELETE CASCADE,
+      adminId TEXT REFERENCES admins(id) ON DELETE CASCADE,
+      expiresAt TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      ip TEXT DEFAULT '',
+      userAgent TEXT DEFAULT ''
+    );
+    CREATE TABLE IF NOT EXISTS transfers (
+      id TEXT PRIMARY KEY,
+      senderId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      recipientId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      message TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      expiresAt TEXT,
+      downloadCount INTEGER NOT NULL DEFAULT 0,
+      firstDownloadAt TEXT,
+      lastDownloadAt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS transfer_files (
+      id TEXT PRIMARY KEY,
+      transferId TEXT NOT NULL REFERENCES transfers(id) ON DELETE CASCADE,
+      storedFile TEXT NOT NULL,
+      originalName TEXT NOT NULL,
+      mime TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL DEFAULT 'info',
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      transferId TEXT REFERENCES transfers(id) ON DELETE SET NULL,
+      isRead INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actorType TEXT NOT NULL DEFAULT 'student',
+      actorId TEXT NOT NULL DEFAULT '',
+      actorName TEXT NOT NULL DEFAULT '',
+      action TEXT NOT NULL,
+      details TEXT NOT NULL DEFAULT '',
+      ip TEXT NOT NULL DEFAULT '',
+      createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_users_lower ON users(usernameLower);
+    CREATE INDEX IF NOT EXISTS idx_users_class ON users(classId);
+    CREATE INDEX IF NOT EXISTS idx_transfers_sender ON transfers(senderId);
+    CREATE INDEX IF NOT EXISTS idx_transfers_recipient ON transfers(recipientId);
+    CREATE INDEX IF NOT EXISTS idx_transfers_status ON transfers(status);
+    CREATE INDEX IF NOT EXISTS idx_transfers_created ON transfers(createdAt);
+    CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(userId, isRead, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actorId, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(tokenHash);
+    CREATE INDEX IF NOT EXISTS idx_sessions_exp ON sessions(expiresAt);
+    CREATE INDEX IF NOT EXISTS idx_tfiles_transfer ON transfer_files(transferId);
+  `);
+}
+
+async function seed(db: DatabaseSync): Promise<void> {
+  const now = nowISO();
+  for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) {
+    db.prepare('INSERT OR IGNORE INTO system_settings(key, value, updatedAt) VALUES (?, ?, ?)').run(k, v, now);
+  }
+  for (const name of DEFAULT_CLASSES) {
+    const exists = db.prepare('SELECT id FROM classes WHERE name = ?').get(name) as unknown as { id: string } | undefined;
+    if (!exists) {
+      db.prepare('INSERT INTO classes(id, name, enabled, createdAt) VALUES (?, ?, 1, ?)').run(newId(), name, now);
+    }
+  }
+
+  // Default admin (only if none exists). Credentials are printed once to server console.
+  const adminCount = (db.prepare('SELECT COUNT(*) AS c FROM admins').get() as unknown as { c: number }).c;
+  if (adminCount === 0) {
+    const passwordHash = await hashPassword('Admin123!');
+    db.prepare('INSERT INTO admins(id, username, usernameLower, passwordHash, createdAt) VALUES (?, ?, ?, ?, ?)').run(
+      newId(),
+      'admin',
+      'admin',
+      passwordHash,
+      now
+    );
+    console.log('\n[Open Send] Default admin created → username: admin | password: Admin123!');
+    console.log('[Open Send] Change it immediately in /webadmin → System.\n');
+  }
+}
+
+let seedPromise: Promise<void> | null = null;
+
+export function getDb(): DatabaseSync {
+  if (g.__opensendDb) return g.__opensendDb;
+  ensureDirs();
+  fs.mkdirSync(dataDir(), { recursive: true });
+  const db = new DatabaseSync(dbPath());
+  // Enable FK enforcement for this connection.
+  try {
+    db.exec('PRAGMA foreign_keys = ON;');
+  } catch {}
+  migrate(db);
+  g.__opensendDb = db;
+  if (!seedPromise) {
+    seedPromise = seed(db).catch((e) => console.error('[Open Send] seed failed:', e));
+  }
+  return db;
+}
+
+export async function dbReady(): Promise<DatabaseSync> {
+  const db = getDb();
+  if (seedPromise) await seedPromise;
+  return db;
+}
+
+export function closeDb(): void {
+  try {
+    g.__opensendDb?.close();
+  } catch {}
+  g.__opensendDb = undefined;
+  seedPromise = null;
+}
+
+// ---------- Typed row helpers ----------
+export interface ClassRow { id: string; name: string; enabled: number; createdAt: string }
+export interface UserRow {
+  id: string; username: string; usernameLower: string; displayName: string;
+  passwordHash: string; classId: string | null; enabled: number;
+  createdAt: string; lastLoginAt: string | null;
+}
+export interface AdminRow { id: string; username: string; usernameLower: string; passwordHash: string; createdAt: string }
+export interface TransferRow {
+  id: string; senderId: string; recipientId: string; message: string; status: string;
+  expiresAt: string | null; downloadCount: number; firstDownloadAt: string | null;
+  lastDownloadAt: string | null; createdAt: string; updatedAt: string;
+}
+export interface TransferFileRow {
+  id: string; transferId: string; storedFile: string; originalName: string; mime: string; size: number; createdAt: string;
+}
+export interface NotificationRow {
+  id: string; userId: string; kind: string; title: string; body: string;
+  transferId: string | null; isRead: number; createdAt: string;
+}
+
+export function publicUser(u: UserRow & { className?: string | null }): {
+  id: string; username: string; displayName: string; classId: string | null; className: string | null;
+} {
+  return { id: u.id, username: u.username, displayName: u.displayName, classId: u.classId, className: (u as { className?: string | null }).className ?? null };
+}
+
+export function checkpointDb(): void {
+  try {
+    getDb().exec('PRAGMA wal_checkpoint(TRUNCATE);');
+  } catch {}
+}
+
+export async function vacuumDb(): Promise<void> {
+  getDb().exec('VACUUM');
+}

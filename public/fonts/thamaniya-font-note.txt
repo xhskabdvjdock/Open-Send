@@ -1,0 +1,17 @@
+ضع هنا ملفات خط ثمانية (Thamaniya) المرخّصة بصيغة woff2 / woff / ttf
+حتى يستخدمها الموقع تلقائياً للغة العربية:
+
+  Thamaniya-Regular.woff2  (أو .woff / .ttf)
+  Thamaniya-Bold.woff2     (أو .woff / .ttf)
+
+بدون هذه الملفات يستخدم الموقع خطاً بديلاً مضمّناً يعمل بدون إنترنت.
+لا حاجة لتعديل أي كود — فقط انسخ الملفات وأعد تشغيل السيرفر.
+
+---
+Place licensed Thamaniya (خط ثمانية) font files here as woff2 / woff / ttf:
+
+  Thamaniya-Regular.woff2  (or .woff / .ttf)
+  Thamaniya-Bold.woff2     (or .woff / .ttf)
+
+Without these files the site uses a bundled offline-safe fallback.
+No code changes needed — just copy the files and restart the server.
