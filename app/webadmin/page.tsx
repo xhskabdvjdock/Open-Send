@@ -8,16 +8,19 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Users, Shapes, ArrowLeftRight, HardDrive, Settings as SettingsIcon,
   ScrollText, Server, LogOut, ShieldAlert, Plus, Pencil, Trash2, KeyRound, Upload, RefreshCw,
+  GraduationCap, FolderOpen, Download, Eye,
 } from 'lucide-react';
 import { formatBytes } from '@/lib/validation';
 import { useT, type TKey, translateError } from '@/lib/i18n';
 import { useConfirm, usePrompt } from '@/components/dialogs';
 
-type Tab = 'overview' | 'students' | 'classes' | 'transfers' | 'storage' | 'settings' | 'logs' | 'system';
+type Tab = 'overview' | 'students' | 'teachers' | 'folders' | 'classes' | 'transfers' | 'storage' | 'settings' | 'logs' | 'system';
 
 const TABS: { id: Tab; labelKey: TKey; icon: React.ReactNode }[] = [
   { id: 'overview', labelKey: 'tabOverview', icon: <LayoutDashboard size={15} /> },
   { id: 'students', labelKey: 'tabStudents', icon: <Users size={15} /> },
+  { id: 'teachers', labelKey: 'tabTeachers', icon: <GraduationCap size={15} /> },
+  { id: 'folders', labelKey: 'tabFolders', icon: <FolderOpen size={15} /> },
   { id: 'classes', labelKey: 'tabClasses', icon: <Shapes size={15} /> },
   { id: 'transfers', labelKey: 'tabTransfers', icon: <ArrowLeftRight size={15} /> },
   { id: 'storage', labelKey: 'tabStorage', icon: <HardDrive size={15} /> },
@@ -120,6 +123,8 @@ export default function WebAdminPage() {
 
       {tab === 'overview' && <Overview />}
       {tab === 'students' && <Students />}
+      {tab === 'teachers' && <Teachers />}
+      {tab === 'folders' && <Folders />}
       {tab === 'classes' && <Classes />}
       {tab === 'transfers' && <Transfers />}
       {tab === 'storage' && <Storage />}
@@ -584,6 +589,289 @@ function Transfers() {
   );
 }
 
+function Teachers() {
+  const { t } = useT();
+  const { dialog: confirmDialog, ask: askConfirm } = useConfirm();
+  const { dialog: promptDialog, ask: askPrompt } = usePrompt();
+  const [items, setItems] = useState<{ id: string; username: string; displayName: string; enabled: number; folderCount: number; submissionCount: number; classes: { id: string; name: string }[]; createdAt: string; lastLoginAt: string | null }[]>([]);
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+  const [q, setQ] = useState('');
+  const [msg, setMsg] = useState('');
+  const [create, setCreate] = useState({ username: '', password: '', displayName: '', classIds: [] as string[] });
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ displayName: '', classIds: [] as string[], enabled: true });
+  const [detail, setDetail] = useState<{ teacher: { username: string; displayName: string; folders: { id: string; name: string; status: string; submissionCount: number }[]; activity: { id: number; action: string; details: string; createdAt: string }[] } } | null>(null);
+
+  async function load() {
+    try {
+      const j = await api(`/api/admin/teachers?q=${encodeURIComponent(q)}`);
+      setItems(j.teachers);
+      const c = await api('/api/admin/classes');
+      setClasses(c.classes);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function toggleCreateClass(id: string) {
+    setCreate((f) => ({ ...f, classIds: f.classIds.includes(id) ? f.classIds.filter((x) => x !== id) : [...f.classIds, id] }));
+  }
+  function toggleEditClass(id: string) {
+    setEditForm((f) => ({ ...f, classIds: f.classIds.includes(id) ? f.classIds.filter((x) => x !== id) : [...f.classIds, id] }));
+  }
+
+  async function createTeacher(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await api('/api/admin/teachers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(create) });
+      setCreate({ username: '', password: '', displayName: '', classIds: [] });
+      setMsg(t('saved'));
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function saveEdit(id: string) {
+    try {
+      await api(`/api/admin/teachers/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editForm) });
+      setEditing(null);
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function remove(id: string, username: string) {
+    const ok = await askConfirm({ title: `@${username}`, message: t('delStudentHint'), okLabel: t('del'), danger: true });
+    if (!ok) return;
+    try {
+      await api(`/api/admin/teachers/${id}`, { method: 'DELETE' });
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function resetPw(id: string) {
+    const np = await askPrompt({ title: t('changePassword'), placeholder: t('tmpPwPh'), okLabel: t('save'), minLength: 6, isPassword: true });
+    if (!np) return;
+    try {
+      await api(`/api/admin/teachers/${id}/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword: np }) });
+      setMsg(t('pwChanged'));
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function open(id: string) {
+    try {
+      const j = await api(`/api/admin/teachers/${id}`);
+      setDetail(j);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  return (
+    <div className="grid">
+      {confirmDialog}
+      {promptDialog}
+      {msg && <div className="card"><span className="small">{msg}</span></div>}
+      <div className="card">
+        <div className="row">
+          <input className="input" style={{ maxWidth: 260 }} placeholder={t('stSearchPh')} value={q} onChange={(e) => setQ(e.target.value)} />
+          <button className="btn btn-sm btn-primary" onClick={load}>{t('stSearch')}</button>
+        </div>
+        <div className="table-wrap mt">
+          <table className="tbl">
+            <thead><tr><th>{t('stName')}</th><th>{t('stUsername')}</th><th>{t('assignedClasses')}</th><th>{t('foldersCount')}</th><th>{t('submissions')}</th><th>{t('stStatus')}</th><th>{t('stActions')}</th></tr></thead>
+            <tbody>
+              {items.map((u) => (
+                <tr key={u.id}>
+                  <td>{editing === u.id ? <input className="input" value={editForm.displayName} onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })} /> : String(u.displayName)}</td>
+                  <td dir="ltr">@{u.username}</td>
+                  <td className="small">
+                    {editing === u.id ? (
+                      <div className="row">
+                        {classes.map((c) => (
+                          <label key={c.id} className="small"><input type="checkbox" checked={editForm.classIds.includes(c.id)} onChange={() => toggleEditClass(c.id)} /> {c.name}</label>
+                        ))}
+                      </div>
+                    ) : (u.classes || []).map((c) => c.name).join(' · ') || '—'}
+                  </td>
+                  <td className="small">{u.folderCount}</td>
+                  <td className="small">{u.submissionCount}</td>
+                  <td>
+                    {editing === u.id ? (
+                      <select className="select" value={editForm.enabled ? '1' : '0'} onChange={(e) => setEditForm({ ...editForm, enabled: e.target.value === '1' })}>
+                        <option value="1">{t('stEnabled')}</option>
+                        <option value="0">{t('stDisabled')}</option>
+                      </select>
+                    ) : (u.enabled ? t('stEnabled') : t('stDisabled'))}
+                  </td>
+                  <td>
+                    <div className="row">
+                      {editing === u.id ? (
+                        <>
+                          <button className="btn btn-sm btn-primary" onClick={() => saveEdit(u.id)}>{t('save')}</button>
+                          <button className="btn btn-sm" onClick={() => setEditing(null)}>{t('stCancel')}</button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn btn-sm" onClick={() => open(u.id)}><Eye size={13} /></button>
+                          <button className="btn btn-sm" onClick={() => { setEditing(u.id); setEditForm({ displayName: u.displayName, classIds: (u.classes || []).map((c) => c.id), enabled: !!u.enabled }); }}><Pencil size={13} /></button>
+                          <button className="btn btn-sm" title={t('changePassword')} onClick={() => resetPw(u.id)}><KeyRound size={13} /></button>
+                          <button className="btn btn-sm" onClick={() => remove(u.id, u.username)}><Trash2 size={13} /></button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="card">
+        <h3><Plus size={15} /> {t('createTeacher')}</h3>
+        <form onSubmit={createTeacher}>
+          <label className="lbl">{t('username')}</label>
+          <input className="input" value={create.username} onChange={(e) => setCreate({ ...create, username: e.target.value })} required />
+          <label className="lbl">{t('password')}</label>
+          <input className="input" type="password" value={create.password} onChange={(e) => setCreate({ ...create, password: e.target.value })} required />
+          <label className="lbl">{t('displayName')}</label>
+          <input className="input" value={create.displayName} onChange={(e) => setCreate({ ...create, displayName: e.target.value })} required />
+          <label className="lbl">{t('assignedClasses')}</label>
+          <div className="row">
+            {classes.map((c) => (
+              <label key={c.id} className="small"><input type="checkbox" checked={create.classIds.includes(c.id)} onChange={() => toggleCreateClass(c.id)} /> {c.name}</label>
+            ))}
+          </div>
+          <button className="btn btn-primary mt">{t('stCreateBtn')}</button>
+        </form>
+      </div>
+      {detail && (
+        <div className="card">
+          <h3>@{detail.teacher.username} — {detail.teacher.displayName}</h3>
+          <p className="small muted">{t('foldersCount')}: {detail.teacher.folders.length}</p>
+          {detail.teacher.folders.map((f) => (
+            <div key={f.id} className="small">{f.name} · {f.status} · {f.submissionCount}</div>
+          ))}
+          <h4 className="mt">{t('activity')}</h4>
+          {detail.teacher.activity.map((a) => (
+            <div key={a.id} className="small">{a.action} · {a.details?.slice(0, 100)} · {String(a.createdAt).slice(0, 19).replace('T', ' ')}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Folders() {
+  const { t } = useT();
+  const { dialog: confirmDialog, ask: askConfirm } = useConfirm();
+  const [items, setItems] = useState<{ id: string; name: string; teacherName: string; teacherUsername: string; status: string; submissionCount: number; studentCount: number; classes: { id: string; name: string }[]; deadline: string | null }[]>([]);
+  const [q, setQ] = useState('');
+  const [msg, setMsg] = useState('');
+  const [detail, setDetail] = useState<{ folder: { id: string; name: string }; submissions: { id: string; studentName: string; status: string; createdAt: string }[] } | null>(null);
+  const [zipBusy, setZipBusy] = useState(false);
+
+  async function load() {
+    try {
+      const j = await api(`/api/admin/folders?q=${encodeURIComponent(q)}`);
+      setItems(j.folders);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function open(id: string) {
+    try {
+      const j = await api(`/api/admin/folders/${id}`);
+      setDetail(j);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function del(id: string, name: string) {
+    const ok = await askConfirm({ title: name, message: t('delTransferMsg'), okLabel: t('del'), danger: true });
+    if (!ok) return;
+    try {
+      await api(`/api/admin/folders/${id}`, { method: 'DELETE' });
+      setDetail(null);
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function zip(id: string) {
+    setZipBusy(true);
+    try {
+      const j = await api(`/api/admin/folders/${id}/zip`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      window.location.href = `/api/admin/folders/${id}/zip?file=${encodeURIComponent(j.file)}`;
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setZipBusy(false);
+    }
+  }
+
+  return (
+    <div className="grid">
+      {confirmDialog}
+      {msg && <div className="card"><span className="small">{msg}</span></div>}
+      <div className="card">
+        <div className="row">
+          <input className="input" style={{ maxWidth: 260 }} placeholder={t('stSearchPh')} value={q} onChange={(e) => setQ(e.target.value)} />
+          <button className="btn btn-sm btn-primary" onClick={load}>{t('stSearch')}</button>
+        </div>
+        <div className="table-wrap mt">
+          <table className="tbl">
+            <thead><tr><th>{t('folderName')}</th><th>{t('teacherRole')}</th><th>{t('class')}</th><th>{t('submissions')}</th><th>{t('status')}</th><th>{t('stActions')}</th></tr></thead>
+            <tbody>
+              {items.map((f) => (
+                <tr key={f.id}>
+                  <td><b>{f.name}</b><div className="small muted">{f.deadline ? String(f.deadline).slice(0, 16).replace('T', ' ') : ''}</div></td>
+                  <td className="small">{f.teacherName} (@{f.teacherUsername})</td>
+                  <td className="small">{(f.classes || []).map((c) => c.name).join(' · ')}</td>
+                  <td className="small">{f.submissionCount} / {f.studentCount}</td>
+                  <td><span className="status status-accepted">{f.status}</span></td>
+                  <td>
+                    <div className="row">
+                      <button className="btn btn-sm" onClick={() => open(f.id)}><Eye size={13} /> {t('view')}</button>
+                      <button className="btn btn-sm" disabled={zipBusy} onClick={() => zip(f.id)}><Download size={13} /> ZIP</button>
+                      <button className="btn btn-sm" onClick={() => del(f.id, f.name)}><Trash2 size={13} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {detail && (
+        <div className="card">
+          <h3>{detail.folder.name}</h3>
+          {detail.submissions.map((s) => (
+            <div key={s.id} className="small">{s.studentName} · {s.status} · {String(s.createdAt).slice(0, 16).replace('T', ' ')}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Storage() {
   const { t } = useT();
   const [info, setInfo] = useState<Record<string, number> | null>(null);
@@ -704,6 +992,11 @@ function SettingsPanel() {
         <p className="hint">{t('seRestrHint')}</p>
         <p className="hint" dir="ltr">{classes.map((c) => `${c.name} = ${c.id}`).join(' · ') || '—'}</p>
         <textarea className="textarea" rows={5} value={restrictions} onChange={(e) => setRestrictions(e.target.value)} dir="ltr" />
+      </div>
+      <div className="card">
+        <h3>{t('tabTeachers')} / {t('tabFolders')}</h3>
+        <label className="lbl">allowTeacherDeleteFolders</label>{bool('allowTeacherDeleteFolders')}
+        <label className="lbl">zipRetentionMinutes</label>{num('zipRetentionMinutes')}
       </div>
       <div className="card">
         <h3>{t('seStorage')}</h3>

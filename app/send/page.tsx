@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Search, UploadCloud, X, File as FileIcon, Check } from 'lucide-react';
+import Link from 'next/link';
+import { Search, UploadCloud, X, File as FileIcon, Check, FolderOpen, User } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { formatBytes } from '@/lib/validation';
 
@@ -26,9 +27,12 @@ export default function SendPage() {
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
   const [limits, setLimits] = useState({ maxFileSizeMB: 50, maxFilesPerTransfer: 5 });
+  const [mode, setMode] = useState<'student' | 'folder'>('student');
+  const [teacherFolders, setTeacherFolders] = useState<{ id: string; name: string; teacherName: string; deadline: string | null }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    fetch('/api/folders', { cache: 'no-store' }).then((r) => r.json()).then((j) => setTeacherFolders(j.folders || [])).catch(() => {});
     fetch('/api/classes', { cache: 'no-store' }).then((r) => r.json()).then((j) => setClasses(j.classes || [])).catch(() => {});
     fetch('/api/settings/public', { cache: 'no-store' }).then((r) => r.json()).then((j) => {
       if (j.settings) setLimits({ maxFileSizeMB: j.settings.maxFileSizeMB, maxFilesPerTransfer: j.settings.maxFilesPerTransfer });
@@ -115,10 +119,36 @@ export default function SendPage() {
     <div className="grid" style={{ maxWidth: 720, marginInline: 'auto' }}>
       <div className="card">
         <h2>{t('sendFile')}</h2>
-        {error && <p className="error-box">{error}</p>}
-        {ok && <p className="ok-box">{ok}</p>}
-
-        <label className="lbl">{t('recipient')}</label>
+        <div className="admin-tabs" role="tablist">
+          <button type="button" className={mode === 'student' ? 'active' : ''} onClick={() => setMode('student')}>
+            <User size={14} /> {t('sendToStudent')}
+          </button>
+          <button type="button" className={mode === 'folder' ? 'active' : ''} onClick={() => setMode('folder')}>
+            <FolderOpen size={14} /> {t('sendToFolder')}
+          </button>
+        </div>
+        {mode === 'folder' && (
+          <div className="grid">
+            <p className="small muted">{t('sendTo')}: {t('sendToFolder')}</p>
+            {teacherFolders.map((f) => (
+              <Link key={f.id} href={`/folders/${f.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div className="student-row">
+                  <span className="avatar"><FolderOpen size={18} /></span>
+                  <div className="grow">
+                    <b>{f.name}</b>
+                    <div className="small muted">{f.teacherName} · {t('deadline')}: {f.deadline ? f.deadline.slice(0, 16).replace('T', ' ') : '—'}</div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+            {teacherFolders.length === 0 && <p className="small muted">{t('noReceivedHint')}</p>}
+          </div>
+        )}
+        {mode === 'student' && (
+          <>
+            {error && <p className="error-box">{error}</p>}
+            {ok && <p className="ok-box">{ok}</p>}
+            <label className="lbl">{t('recipient')}</label>
         {recipient ? (
           <div className="student-row">
             <span className="avatar">{recipient.displayName.slice(0, 1).toUpperCase()}</span>
@@ -216,6 +246,8 @@ export default function SendPage() {
         <button className="btn btn-primary btn-block mt" onClick={send} disabled={busy || !recipient || files.length === 0}>
           {busy ? <span className="spinner" /> : null} {t('sendButton')}
         </button>
+          </>
+        )}
       </div>
     </div>
   );

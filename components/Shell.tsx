@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Send, Inbox, FolderUp, Bell, User, Settings as SettingsIcon, SendHorizonal } from 'lucide-react';
+import { Home, Send, Inbox, FolderUp, Bell, User, Settings as SettingsIcon, SendHorizonal, FolderOpen, ClipboardList } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n';
 
@@ -32,11 +32,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = pathname === '/login' || pathname === '/register';
   const isAdminArea = pathname.startsWith('/webadmin');
+  const isTeacherArea = pathname.startsWith('/teacher');
   // NOTE: /webadmin is intentionally never linked from student UI.
 
   const links = [
     { href: '/', label: t('home'), icon: <Home size={18} /> },
     { href: '/send', label: t('send'), icon: <Send size={18} /> },
+    { href: '/folders', label: t('teacherFolders'), icon: <FolderOpen size={18} /> },
+    { href: '/submissions', label: t('mySubmissions'), icon: <ClipboardList size={18} /> },
     { href: '/received', label: t('received'), icon: <Inbox size={18} /> },
     { href: '/sent', label: t('sent'), icon: <FolderUp size={18} /> },
     { href: '/notifications', label: t('notifications'), icon: <Bell size={18} />, badge: unread },
@@ -60,7 +63,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
           <nav className="nav" aria-label="Main">
-            {!isAuthPage && !isAdminArea &&
+            {!isAuthPage && !isAdminArea && !isTeacherArea &&
               links.map((l) => (
                 <Link key={l.href} href={l.href} className={pathname === l.href ? 'active' : ''}>
                   {l.icon}
@@ -73,7 +76,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <style>{`@media (max-width: 859px){ .hide-mobile{ display:none; } .nav a{ padding:9px 10px; } }`}</style>
       </header>
       <main className="container page">{children}</main>
-      {!isAuthPage && !isAdminArea && (
+      {!isAuthPage && !isAdminArea && !isTeacherArea && (
         <nav className="bottom-nav" aria-label="Mobile">
           {mobileLinks.map((l) => (
             <Link key={l.href} href={l.href} className={pathname === l.href ? 'active' : ''}>

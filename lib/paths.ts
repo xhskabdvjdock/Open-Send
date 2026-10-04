@@ -17,7 +17,7 @@ export function storageRoot(): string {
   return process.env.OPENSEND_STORAGE || path.join(rootDir(), 'storage');
 }
 
-export function storageSubdir(kind: 'pending' | 'accepted' | 'completed' | 'rejected' | 'tmp'): string {
+export function storageSubdir(kind: 'pending' | 'accepted' | 'completed' | 'rejected' | 'tmp' | 'submissions' | 'zips'): string {
   return path.join(storageRoot(), kind);
 }
 
@@ -29,11 +29,11 @@ export function ensureDirs(): void {
   for (const d of [dataDir(), storageRoot(), backupsDir()]) {
     fs.mkdirSync(d, { recursive: true });
   }
-  for (const k of ['pending', 'accepted', 'completed', 'rejected', 'tmp'] as const) {
+  for (const k of ['pending', 'accepted', 'completed', 'rejected', 'tmp', 'submissions', 'zips'] as const) {
     fs.mkdirSync(storageSubdir(k), { recursive: true });
   }
   // Prevent static serving / execution surprises: deny directory listing hint files
-  for (const k of ['pending', 'accepted', 'completed', 'rejected', 'tmp'] as const) {
+  for (const k of ['pending', 'accepted', 'completed', 'rejected', 'tmp', 'submissions', 'zips'] as const) {
     const deny = path.join(storageSubdir(k), '.deny');
     if (!fs.existsSync(deny)) {
       try {
@@ -52,11 +52,39 @@ export function isSafeInternalId(id: string): boolean {
 export function findStoredFile(storedFile: string): string | null {
   if (!isSafeInternalId(storedFile)) return null;
   // storedFile never contains separators, so joining is safe.
-  for (const k of ['accepted', 'completed', 'pending', 'rejected'] as const) {
+  for (const k of ['accepted', 'completed', 'pending', 'rejected', 'submissions'] as const) {
     const p = path.join(storageSubdir(k), storedFile);
     if (fs.existsSync(p)) return p;
   }
   return null;
+}
+
+export function findSubmissionFile(storedFile: string): string | null {
+  if (!isSafeInternalId(storedFile)) return null;
+  const p = path.join(storageSubdir('submissions'), storedFile);
+  return fs.existsSync(p) ? p : null;
+}
+
+/** Sanitize a name for use inside a ZIP or as a Windows-safe filename. */
+export function sanitizeZipSegment(name: string, fallback = 'file'): string {
+  let s = (name || fallback).trim();
+  // Remove path separators and control chars
+  s = s.replace(/[\\/]/g, '-').replace(/[\x00-\x1F\x7F]/g, '');
+  // Windows invalid chars <>:"|?*
+  s = s.replace(/[<>:"|?*]/g, '-');
+  // Dots at start, trailing dots/spaces (Windows)
+  s = s.replace(/^\.+/, '').replace(/[. ]+$/g, '');
+  // Windows reserved names
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i.test(s)) s = '_' + s;
+  s = s.replace(/\s+/g, ' ').trim();
+  if (!s) s = fallback;
+  return s.slice(0, 100);
+}
+
+export function sanitizeZipFileName(name: string): string {
+  const base = sanitizeZipSegment(name, 'folder');
+  // Ensure .zip extension handling is done by caller; just strip extra dots
+  return base.replace(/\.zip$/i, '');
 }
 
 export function locateStoredFileIn(storedFile: string, kind: 'pending' | 'accepted' | 'completed' | 'rejected'): string | null {

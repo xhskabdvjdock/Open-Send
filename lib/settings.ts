@@ -4,6 +4,8 @@ import { nowISO } from './crypto';
 export interface AppSettings {
   appName: string;
   appVersion: string;
+  allowTeacherDeleteFolders: boolean;
+  zipRetentionMinutes: number;
   registrationEnabled: boolean;
   maintenanceMode: boolean;
   allowClassChange: boolean;
@@ -74,6 +76,8 @@ export function getSettings(): AppSettings {
     retentionCompletedDays: Math.max(0, toNum(g('retentionCompletedDays'), 30)),
     autoDeleteExpired: toBool(g('autoDeleteExpired'), true),
     adminCanPreview: toBool(g('adminCanPreview'), false),
+    allowTeacherDeleteFolders: toBool(g('allowTeacherDeleteFolders'), false),
+    zipRetentionMinutes: Math.max(5, toNum(g('zipRetentionMinutes'), 60)),
   };
 }
 
@@ -130,6 +134,8 @@ const ALLOWED_KEYS = new Set([
   'retentionCompletedDays',
   'autoDeleteExpired',
   'adminCanPreview',
+  'allowTeacherDeleteFolders',
+  'zipRetentionMinutes',
 ]);
 
 export function isAllowedSettingKey(k: string): boolean {

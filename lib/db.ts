@@ -19,9 +19,14 @@ const DEFAULT_CLASSES = [
   'Grade 12 - B',
 ];
 
+export const TEACHER_SETTINGS_DEFAULTS: Record<string, string> = {
+  allowTeacherDeleteFolders: 'false',
+  zipRetentionMinutes: '60',
+};
+
 export const DEFAULT_SETTINGS: Record<string, string> = {
   appName: 'Open Send',
-  appVersion: '1.0.0',
+  appVersion: '1.1.0',
   registrationEnabled: 'true',
   maintenanceMode: 'false',
   allowClassChange: 'false',
@@ -40,6 +45,8 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   retentionCompletedDays: '30',
   autoDeleteExpired: 'true',
   adminCanPreview: 'false',
+  allowTeacherDeleteFolders: 'false',
+  zipRetentionMinutes: '60',
 };
 
 function migrate(db: DatabaseSync): void {
@@ -134,6 +141,79 @@ function migrate(db: DatabaseSync): void {
       value TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS teachers (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      usernameLower TEXT NOT NULL UNIQUE,
+      displayName TEXT NOT NULL,
+      passwordHash TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      createdAt TEXT NOT NULL,
+      lastLoginAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS teacher_classes (
+      teacherId TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      classId TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+      PRIMARY KEY (teacherId, classId)
+    );
+    CREATE TABLE IF NOT EXISTS submission_folders (
+      id TEXT PRIMARY KEY,
+      teacherId TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'active',
+      deadline TEXT,
+      maxFileSizeMB INTEGER NOT NULL DEFAULT 50,
+      maxFiles INTEGER NOT NULL DEFAULT 5,
+      maxTotalSizeMB INTEGER NOT NULL DEFAULT 500,
+      allowedExtensions TEXT NOT NULL DEFAULT '',
+      allowMultiple INTEGER NOT NULL DEFAULT 1,
+      allowReplace INTEGER NOT NULL DEFAULT 1,
+      allowDeleteOwn INTEGER NOT NULL DEFAULT 0,
+      allowLate INTEGER NOT NULL DEFAULT 1,
+      lateMode TEXT NOT NULL DEFAULT 'marked',
+      requireMessage INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS folder_classes (
+      folderId TEXT NOT NULL REFERENCES submission_folders(id) ON DELETE CASCADE,
+      classId TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+      PRIMARY KEY (folderId, classId)
+    );
+    CREATE TABLE IF NOT EXISTS submissions (
+      id TEXT PRIMARY KEY,
+      folderId TEXT NOT NULL REFERENCES submission_folders(id) ON DELETE CASCADE,
+      studentId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      teacherId TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      classId TEXT REFERENCES classes(id) ON DELETE SET NULL,
+      submissionNumber INTEGER NOT NULL DEFAULT 1,
+      message TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'current',
+      isLate INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS submission_files (
+      id TEXT PRIMARY KEY,
+      submissionId TEXT NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+      storedFile TEXT NOT NULL,
+      originalName TEXT NOT NULL,
+      mime TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS teacher_notifications (
+      id TEXT PRIMARY KEY,
+      teacherId TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL DEFAULT 'info',
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      folderId TEXT REFERENCES submission_folders(id) ON DELETE SET NULL,
+      submissionId TEXT REFERENCES submissions(id) ON DELETE SET NULL,
+      isRead INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS idx_users_lower ON users(usernameLower);
     CREATE INDEX IF NOT EXISTS idx_users_class ON users(classId);
     CREATE INDEX IF NOT EXISTS idx_transfers_sender ON transfers(senderId);
@@ -146,7 +226,28 @@ function migrate(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(tokenHash);
     CREATE INDEX IF NOT EXISTS idx_sessions_exp ON sessions(expiresAt);
     CREATE INDEX IF NOT EXISTS idx_tfiles_transfer ON transfer_files(transferId);
+    CREATE INDEX IF NOT EXISTS idx_teachers_lower ON teachers(usernameLower);
+    CREATE INDEX IF NOT EXISTS idx_tclasses_teacher ON teacher_classes(teacherId);
+    CREATE INDEX IF NOT EXISTS idx_tclasses_class ON teacher_classes(classId);
+    CREATE INDEX IF NOT EXISTS idx_folders_teacher ON submission_folders(teacherId, status);
+    CREATE INDEX IF NOT EXISTS idx_fclasses_folder ON folder_classes(folderId);
+    CREATE INDEX IF NOT EXISTS idx_fclasses_class ON folder_classes(classId);
+    CREATE INDEX IF NOT EXISTS idx_sub_folder ON submissions(folderId, studentId, status);
+    CREATE INDEX IF NOT EXISTS idx_sub_student ON submissions(studentId);
+    CREATE INDEX IF NOT EXISTS idx_sub_teacher ON submissions(teacherId);
+    CREATE INDEX IF NOT EXISTS idx_sfiles_sub ON submission_files(submissionId);
+    CREATE INDEX IF NOT EXISTS idx_tnotif_teacher ON teacher_notifications(teacherId, isRead, createdAt);
+    -- sessions.teacherId for teacher auth (added if missing)
   `);
+  try {
+    const cols = db.prepare("PRAGMA table_info(sessions)").all() as unknown as { name: string }[];
+    if (!cols.some((c) => c.name === 'teacherId')) {
+      db.exec('ALTER TABLE sessions ADD COLUMN teacherId TEXT REFERENCES teachers(id) ON DELETE CASCADE;');
+    }
+  } catch {}
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_teacher ON sessions(teacherId);');
+  } catch {}
 }
 
 async function seed(db: DatabaseSync): Promise<void> {
@@ -229,6 +330,25 @@ export interface TransferFileRow {
 export interface NotificationRow {
   id: string; userId: string; kind: string; title: string; body: string;
   transferId: string | null; isRead: number; createdAt: string;
+}
+export interface TeacherRow {
+  id: string; username: string; usernameLower: string; displayName: string;
+  passwordHash: string; enabled: number; createdAt: string; lastLoginAt: string | null;
+}
+export interface SubmissionFolderRow {
+  id: string; teacherId: string; name: string; description: string; status: string;
+  deadline: string | null; maxFileSizeMB: number; maxFiles: number; maxTotalSizeMB: number;
+  allowedExtensions: string; allowMultiple: number; allowReplace: number; allowDeleteOwn: number;
+  allowLate: number; lateMode: string; requireMessage: number; createdAt: string; updatedAt: string;
+}
+export interface SubmissionRow {
+  id: string; folderId: string; studentId: string; teacherId: string; classId: string | null;
+  submissionNumber: number; message: string; status: string; isLate: number;
+  createdAt: string; updatedAt: string;
+}
+export interface SubmissionFileRow {
+  id: string; submissionId: string; storedFile: string; originalName: string;
+  mime: string; size: number; createdAt: string;
 }
 
 export function publicUser(u: UserRow & { className?: string | null }): {

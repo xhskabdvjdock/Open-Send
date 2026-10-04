@@ -59,6 +59,19 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   const { deleteTransferFiles } = await import('@/lib/transfers');
   const transfers = db.prepare('SELECT id FROM transfers WHERE senderId = ? OR recipientId = ?').all(params.id, params.id) as unknown as { id: string }[];
   for (const t of transfers) deleteTransferFiles(t.id);
+  // Delete physical files of their teacher-folder submissions (rows cascade, bytes must be removed)
+  try {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { storageSubdir } = await import('@/lib/paths');
+    const sfiles = db.prepare('SELECT storedFile FROM submission_files sf JOIN submissions s ON s.id = sf.submissionId WHERE s.studentId = ?').all(params.id) as unknown as { storedFile: string }[];
+    for (const fl of sfiles) {
+      try {
+        const p = path.join(storageSubdir('submissions'), fl.storedFile);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch {}
+    }
+  } catch {}
   db.prepare('DELETE FROM users WHERE id = ?').run(params.id);
   audit('Admin Deleted Student', { actorType: 'admin', actorId: g.admin.id, actorName: g.admin.username, details: `username=${user.username}`, ip: clientIp(req) });
   return json({ ok: true });

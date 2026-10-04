@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Send, Inbox, FolderUp, Clock, Bell, Wrench } from 'lucide-react';
+import { Send, Inbox, FolderUp, Clock, Bell, Wrench, FolderOpen } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { Loading } from '@/components/feedback';
 
@@ -16,6 +16,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [maintenance, setMaintenance] = useState(false);
   const [counts, setCounts] = useState({ pending: 0, sent: 0, received: 0, unread: 0 });
+  const [folders, setFolders] = useState<{ id: string; name: string; teacherName: string; deadline: string | null; effectiveStatus: string }[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -39,11 +40,13 @@ export default function HomePage() {
           fetch('/api/notifications/unread-count', { cache: 'no-store' }).then((x) => x.json()).catch(() => ({ unread: 0 })),
         ]);
         // Counts need real totals — fetch lightweight lists (limit 200 is fine for school scale)
-        const [p, s, rc] = await Promise.all([
+        const [p, s, rc, fl] = await Promise.all([
           fetch('/api/transfers/mine?type=received&status=PENDING&limit=200', { cache: 'no-store' }).then((x) => x.json()).catch(() => ({ transfers: [] })),
           fetch('/api/transfers/mine?type=sent&limit=200', { cache: 'no-store' }).then((x) => x.json()).catch(() => ({ transfers: [] })),
           fetch('/api/transfers/mine?type=received&limit=200', { cache: 'no-store' }).then((x) => x.json()).catch(() => ({ transfers: [] })),
+          fetch('/api/folders', { cache: 'no-store' }).then((x) => x.json()).catch(() => ({ folders: [] })),
         ]);
+        setFolders((fl.folders || []).slice(0, 6));
         void a; void b; void c;
         setCounts({
           pending: (p.transfers || []).length,
@@ -105,6 +108,33 @@ export default function HomePage() {
           <h3><Bell size={17} style={{ verticalAlign: -3 }} /> {t('notifications')} {counts.unread > 0 && <span className="badge-count">{counts.unread}</span>}</h3>
           <p className="muted small">{t('unread')}</p>
         </Link>
+      </div>
+
+      <div className="card mt">
+        <div className="space">
+          <h3 style={{ margin: 0 }}><FolderOpen size={17} style={{ verticalAlign: -3 }} /> {t('teacherFolders')}</h3>
+          <Link href="/folders" className="btn btn-sm">{t('view')}</Link>
+        </div>
+        {folders.length === 0 ? (
+          <p className="muted small">{t('noReceivedHint')}</p>
+        ) : (
+          <div className="grid mt">
+            {folders.map((f) => (
+              <Link key={f.id} href={`/folders/${f.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div className="file-item">
+                  <FolderOpen size={18} />
+                  <div className="grow">
+                    <b>{f.name}</b>
+                    <div className="small muted">{f.teacherName} · {t('deadline')}: {f.deadline ? f.deadline.slice(0, 16).replace('T', ' ') : '—'}</div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+        <div className="row mt">
+          <Link href="/submissions" className="btn btn-sm">{t('mySubmissions')}</Link>
+        </div>
       </div>
     </div>
   );
