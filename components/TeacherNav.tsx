@@ -27,7 +27,7 @@ export function TeacherNav({ name }: { name?: string }) {
         <div className="row">
           <span className="brand-mark" style={{ width: 32, height: 32 }}><GraduationCap size={18} /></span>
           <div>
-            <b>Open Send · {t('teacherRole')}</b>
+            <b>Open Send <span className="beta-badge">beta</span> · {t('teacherRole')}</b>
             {name && <div className="small muted">{name}</div>}
           </div>
         </div>

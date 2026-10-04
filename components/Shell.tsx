@@ -58,7 +58,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <SendHorizonal size={20} />
             </span>
             <span>
-              {t('brand')}
+              <span className="brand-name">
+                {t('brand')} <span className="beta-badge">beta</span>
+              </span>
               <small>{t('tagline')}</small>
             </span>
           </Link>
