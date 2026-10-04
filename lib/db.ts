@@ -8,7 +8,10 @@ export type Db = DatabaseSync;
 type GlobalWithDb = typeof globalThis & { __opensendDb?: DatabaseSync };
 const g = globalThis as GlobalWithDb;
 
-const DEFAULT_CLASSES = [
+const DEFAULT_CLASSES: string[] = [];
+
+// Classes removed per owner request — deleted from seed and cleaned from existing DBs on boot.
+const REMOVED_DEFAULT_CLASSES = [
   'Grade 10 - A',
   'Grade 10 - B',
   'Grade 10 - C',
@@ -261,6 +264,42 @@ async function seed(db: DatabaseSync): Promise<void> {
       db.prepare('INSERT INTO classes(id, name, enabled, createdAt) VALUES (?, ?, 1, ?)').run(newId(), name, now);
     }
   }
+  // One-time cleanup of previously-seeded default classes:
+  // unlink students/submissions (→ no class) and drop teacher/folder links, then delete the class rows.
+  // Also prunes classRestrictions entries that reference deleted class ids.
+  try {
+    const idsToRemove: string[] = [];
+    for (const name of REMOVED_DEFAULT_CLASSES) {
+      const row = db.prepare('SELECT id FROM classes WHERE name = ?').get(name) as unknown as { id: string } | undefined;
+      if (row) idsToRemove.push(row.id);
+    }
+    for (const cid of idsToRemove) {
+      try { db.prepare('UPDATE users SET classId = NULL WHERE classId = ?').run(cid); } catch {}
+      try { db.prepare('UPDATE submissions SET classId = NULL WHERE classId = ?').run(cid); } catch {}
+      try { db.prepare('DELETE FROM teacher_classes WHERE classId = ?').run(cid); } catch {}
+      try { db.prepare('DELETE FROM folder_classes WHERE classId = ?').run(cid); } catch {}
+      try { db.prepare('DELETE FROM classes WHERE id = ?').run(cid); } catch {}
+    }
+    if (idsToRemove.length > 0) {
+      try {
+        const gone = new Set(idsToRemove);
+        const r = db.prepare("SELECT value FROM system_settings WHERE key = 'classRestrictions'").get() as unknown as { value: string } | undefined;
+        if (r?.value) {
+          const parsed = JSON.parse(r.value) as Record<string, string[]>;
+          let changed = false;
+          for (const k of Object.keys(parsed)) {
+            if (gone.has(k)) { delete parsed[k]; changed = true; continue; }
+            const before = parsed[k].length;
+            parsed[k] = parsed[k].filter((v) => !gone.has(v));
+            if (parsed[k].length !== before) changed = true;
+          }
+          if (changed) {
+            db.prepare("UPDATE system_settings SET value = ?, updatedAt = ? WHERE key = 'classRestrictions'").run(JSON.stringify(parsed), now);
+          }
+        }
+      } catch {}
+    }
+  } catch {}
 
   // Default admin (only if none exists). Credentials are printed once to server console.
   const adminCount = (db.prepare('SELECT COUNT(*) AS c FROM admins').get() as unknown as { c: number }).c;
