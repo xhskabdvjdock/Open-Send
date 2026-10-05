@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
-import { useT } from '@/lib/i18n';
+import { useT, translateNotification } from '@/lib/i18n';
 import { Empty, Loading } from '@/components/feedback';
 
 interface N { id: string; kind: string; title: string; body: string; transferId: string | null; isRead: number; createdAt: string }
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const { t } = useT();
+  const { t, lang } = useT();
   const [items, setItems] = useState<N[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,20 +54,23 @@ export default function NotificationsPage() {
       </div>
       <div className="grid mt">
         {items.length === 0 && <div className="card"><Empty icon={<Bell size={26} />} title={t('noNotifications')} hint={t('noNotificationsHint')} /></div>}
-        {items.map((n) => (
+        {items.map((n) => {
+          const nt = translateNotification(n.title, n.body, lang, n.kind);
+          return (
           <div key={n.id} className={n.isRead ? 'card' : 'card card-unread'}>
             <div className="space">
-              <b>{n.title}</b>
+              <b>{nt.title}</b>
               {!n.isRead && <span className="status status-accepted">{t('unread')}</span>}
             </div>
-            {n.body && <p className="small muted">{n.body}</p>}
+            {nt.body && <p className="small muted">{nt.body}</p>}
             <div className="row mt">
               <span className="small muted">{new Date(n.createdAt).toLocaleString()}</span>
               {n.transferId && <Link href={`/transfers/${n.transferId}`} className="btn btn-sm">{t('view')}</Link>}
               {!n.isRead && <button className="btn btn-sm btn-ghost" onClick={() => markOne(n.id)}>✓</button>}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

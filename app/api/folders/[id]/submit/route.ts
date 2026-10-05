@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { getStudentFromToken, STUDENT_COOKIE, getCookieFromHeader } from '@/lib/auth';
 import { dbReady } from '@/lib/db';
@@ -52,7 +53,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const allowedExts = parseCsvList(folder.allowedExtensions);
   const blockedExts = parseCsvList(settings.blockedExtensions);
 
-  const prepared: { safeName: string; buf: Buffer; mime: string }[] = [];
+  // Gross-size guard BEFORE buffering: reject absurd bodies without loading
+  // gigabytes into memory first (per-file checks below stay authoritative).
+  const contentLength = Number(req.headers.get('content-length') || 0);
+  if (Number.isFinite(contentLength) && contentLength > 0 && contentLength > maxTotal + 32 * 1024 * 1024) {
+    return err(`Total submission size exceeds ${folder.maxTotalSizeMB} MB.`, 413);
+  }
+
+  // Validate metadata of all files first (no bytes buffered yet).
+  const prepared: { file: File; safeName: string; mime: string }[] = [];
   let total = 0;
   for (const f of files) {
     const safeName = sanitizeOriginalName((f as File).name || 'file');
@@ -64,9 +73,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (allowedExts.length > 0 && !allowedExts.includes(ext)) return err(`File type ".${ext || '?'}" is not allowed for this folder.`, 400);
     total += size;
     if (total > maxTotal) return err(`Total submission size exceeds ${folder.maxTotalSizeMB} MB.`, 413);
-    const buf = Buffer.from(await (f as File).arrayBuffer());
-    if (buf.length === 0) return err(`File "${safeName}" could not be read.`, 400);
-    prepared.push({ safeName, buf, mime: (f as File).type || MIME_FALLBACK });
+    prepared.push({ file: f as File, safeName, mime: (f as File).type || MIME_FALLBACK });
   }
 
   const db = await dbReady();
@@ -87,23 +94,32 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       "INSERT INTO submissions(id, folderId, studentId, teacherId, classId, submissionNumber, message, status, isLate, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, 'current', ?, ?, ?)"
     ).run(submissionId, params.id, sess.user.id, folder.teacherId, sess.user.classId, nextNumber, message, isLate, now, now);
     const insFile = db.prepare('INSERT INTO submission_files(id, submissionId, storedFile, originalName, mime, size, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    // Stream through files ONE AT A TIME (read → write → release) so peak
+    // memory is one file, not the whole batch — and use async writes so a big
+    // file never blocks the event loop for other students.
     for (const p of prepared) {
+      const buf = Buffer.from(await p.file.arrayBuffer());
+      if (buf.length === 0) {
+        throw new Error(`unreadable:${p.safeName}`);
+      }
       const storedFile = newId();
       const dest = path.join(storageSubdir('submissions'), storedFile);
-      fs.writeFileSync(dest, p.buf);
+      await writeFile(dest, buf);
       written.push(dest);
-      insFile.run(newId(), submissionId, storedFile, p.safeName, p.mime.slice(0, 120), p.buf.length, now);
+      insFile.run(newId(), submissionId, storedFile, p.safeName, p.mime.slice(0, 120), buf.length, now);
     }
     // If replacement (not multiple): mark older current submissions as replaced
     if (folder.allowMultiple !== 1 && existing.length > 0) {
       const upd = db.prepare("UPDATE submissions SET status = 'replaced', updatedAt = ? WHERE id = ?");
       for (const e of existing) upd.run(now, e.id);
     }
-  } catch {
+  } catch (e) {
     for (const w of written) {
       try { fs.unlinkSync(w); } catch {}
     }
     try { db.prepare('DELETE FROM submissions WHERE id = ?').run(submissionId); } catch {}
+    const msg = e instanceof Error ? e.message : '';
+    if (msg.startsWith('unreadable:')) return err(`File "${msg.slice(11)}" could not be read.`, 400);
     return err('Upload failed. Please try again.', 500);
   }
 

@@ -1062,7 +1062,13 @@ function System() {
   const { t } = useT();
   const { dialog: confirmDialog, ask: askConfirm } = useConfirm();
   const [sys, setSys] = useState<Record<string, string | number> | null>(null);
-  const [net, setNet] = useState<{ localUrl: string; lanUrls: string[]; primaryUrl: string; port: number; status: string } | null>(null);
+  const [net, setNet] = useState<{
+    localUrl: string; lanUrls: string[]; primaryUrl: string; port: number; status: string;
+    expectedIp?: string; hostname?: string; hostnameUrl?: string; ipUrl?: string;
+    detectedIps?: string[]; hasExpectedIp?: boolean;
+    mdns?: string; mdnsResolvedIp?: string | null;
+    firewall?: { app: string; mdns: string }; server?: string; warning?: string | null;
+  } | null>(null);
   const [backups, setBackups] = useState<{ name: string; size: number; createdAt: string }[]>([]);
   const [msg, setMsg] = useState('');
   const [includeFiles, setIncludeFiles] = useState(false);
@@ -1075,7 +1081,7 @@ function System() {
       setSys(a.system);
       setNet(b);
       setBackups(c.backups);
-      setQrUrl((prev) => prev || b.primaryUrl || '');
+      setQrUrl((prev) => prev || b.hostnameUrl || b.primaryUrl || '');
     } catch (e) {
       setMsg((e as Error).message);
     }
@@ -1137,21 +1143,9 @@ function System() {
           ) : t('loading')}
         </div>
         <div className="card">
-          <h3>{t('syNetwork')}</h3>
+          <h3>{t('netTitle')}</h3>
           {net ? (
-            <>
-              <p className="small">{t('syStatus')}: <b dir="ltr">{net.localUrl}</b></p>
-              {net.lanUrls.map((u) => <p key={u} className="small">LAN: <b dir="ltr">{u}</b></p>)}
-              <label className="lbl">{t('syQrLabel')}</label>
-              <select className="select" value={qrUrl} onChange={(e) => setQrUrl(e.target.value)} dir="ltr">
-                {net.lanUrls.map((u) => <option key={u} value={u}>{u}</option>)}
-              </select>
-              <div className="qr-box mt">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {qrUrl && <img src={`/api/admin/qr?text=${encodeURIComponent(qrUrl)}`} alt="LAN QR" width={180} height={180} />}
-              </div>
-              <p className="hint">{t('syQrHint')}</p>
-            </>
+            <NetworkPanel net={net} qrUrl={qrUrl} setQrUrl={setQrUrl} />
           ) : t('loading')}
         </div>
       </div>
@@ -1192,6 +1186,123 @@ function System() {
           <input className="input" style={{ maxWidth: 220 }} type="password" placeholder={t('syNew')} value={pw.newPassword} onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} required minLength={8} />
           <button className="btn btn-sm btn-primary">{t('syChange')}</button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+/* Network information section: status, hostname/IP/port/mDNS, copy + QR + help.
+   QR is generated locally via /api/admin/qr (no external service). */
+function NetworkPanel({ net, qrUrl, setQrUrl }: {
+  net: {
+    localUrl: string; lanUrls: string[]; primaryUrl: string; port: number; status: string;
+    expectedIp?: string; hostname?: string; hostnameUrl?: string; ipUrl?: string;
+    detectedIps?: string[]; hasExpectedIp?: boolean;
+    mdns?: string; mdnsResolvedIp?: string | null;
+    firewall?: { app: string; mdns: string }; server?: string; warning?: string | null;
+  };
+  qrUrl: string;
+  setQrUrl: (u: string) => void;
+}) {
+  const { t } = useT();
+  const [copied, setCopied] = useState('');
+  const hostnameUrl = net.hostnameUrl || net.primaryUrl;
+  const ipUrl = net.ipUrl || net.primaryUrl;
+  const mdnsActive = (net.mdns || '') === 'Active';
+
+  async function copyText(text: string, okMsg: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Fallback for older browsers / non-secure contexts (http on LAN is fine,
+      // but clipboard API may still be unavailable — use a temporary textarea).
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch {}
+    }
+    setCopied(okMsg);
+    setTimeout(() => setCopied(''), 2000);
+  }
+
+  function copyDiagnostics() {
+    const lines = [
+      `Hostname: ${net.hostname || ''}`,
+      `Expected IP: ${net.expectedIp || ''}`,
+      `Detected IP: ${(net.detectedIps || []).join(', ') || ''}`,
+      `Port: ${net.port}`,
+      `mDNS: ${net.mdns || ''}`,
+      `Server: ${net.server || net.status || 'Running'}`,
+    ];
+    copyText(lines.join('\n'), t('netDiagCopied'));
+  }
+
+  const qrOptions = [hostnameUrl, ipUrl, ...(net.lanUrls || [])].filter(
+    (u, i, a) => u && a.indexOf(u) === i
+  );
+
+  return (
+    <div>
+      <dl className="kv">
+        <dt>{t('netStatus')}</dt>
+        <dd><span aria-hidden>●</span> {t('netOnline')}</dd>
+        <dt>{t('netLocalAddress')}</dt>
+        <dd><b dir="ltr">{hostnameUrl}</b></dd>
+        <dt>{t('netIpAddress')}</dt>
+        <dd><span dir="ltr">{net.expectedIp || ''}</span></dd>
+        <dt>{t('netPort')}</dt>
+        <dd dir="ltr">{net.port}</dd>
+        <dt>{t('netMdns')}</dt>
+        <dd>
+          <span aria-hidden>●</span> {mdnsActive ? t('netActive') : t('netUnavailable')}
+        </dd>
+        {!mdnsActive && (
+          <>
+            <dt>{t('netFallback')}</dt>
+            <dd><span dir="ltr">{ipUrl}</span></dd>
+          </>
+        )}
+      </dl>
+
+      {net.hasExpectedIp === false && (
+        <p className="error-box small">{t('netWarnIp')}</p>
+      )}
+      {!mdnsActive && (
+        <p className="hint small">{t('netWarnMdns')}</p>
+      )}
+
+      <div className="row mt">
+        <button className="btn btn-sm btn-primary" onClick={() => copyText(hostnameUrl, t('netCopied'))}>
+          {t('netCopyAddress')}
+        </button>
+        <button className="btn btn-sm" onClick={copyDiagnostics}>
+          {t('netCopyDiag')}
+        </button>
+        <a className="btn btn-sm" href="/webadmin/network">{t('netOpenDiag')}</a>
+      </div>
+      {copied && <p className="hint small mt">{copied}</p>}
+
+      <label className="lbl mt">{t('netQrCode')}</label>
+      <select className="select" value={qrUrl} onChange={(e) => setQrUrl(e.target.value)} dir="ltr">
+        {qrOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+      </select>
+      <div className="qr-box mt">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {qrUrl && <img src={`/api/admin/qr?text=${encodeURIComponent(qrUrl)}`} alt="LAN QR" width={180} height={180} />}
+      </div>
+      <p className="hint">{t('syQrHint')}</p>
+
+      <div className="mt">
+        <b className="small">{t('netHowTitle')}</b>
+        <ol className="small muted">
+          <li>{t('netHow1')}</li>
+          <li>{t('netHow2')}</li>
+          <li>{t('netHow3')} <b dir="ltr">{hostnameUrl}</b></li>
+        </ol>
       </div>
     </div>
   );

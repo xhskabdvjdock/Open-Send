@@ -89,11 +89,23 @@ a:hover { text-decoration-thickness: 2px; }
 
 .nav { display: flex; gap: 4px; margin-inline-start: auto; align-items: center; flex-wrap: wrap; }
 .nav a {
-  display: inline-flex; align-items: center; gap: 7px;
+  display: inline-flex; align-items: center; gap: 0;
   padding: 10px 11px; border-radius: 999px; color: var(--text);
   font-weight: 700; font-size: 14px; border: 1.5px solid transparent;
-  text-decoration: none; min-height: 44px;
+  text-decoration: none; min-height: 44px; overflow: hidden;
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease;
 }
+/* Icon-only by default; hovering expands the pill sideways to reveal the name. */
+.nav a .nav-label {
+  max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap;
+  margin-inline-start: 0;
+  transition: max-width .25s ease, opacity .18s ease, margin-inline-start .25s ease;
+}
+.nav a:hover .nav-label, .nav a:focus-visible .nav-label {
+  max-width: 140px; opacity: 1; margin-inline-start: 7px;
+}
+/* Icon-only pills have no gap, so keep the notification badge spaced. */
+.nav a .badge-count { margin-inline-start: 6px; }
 .nav a:hover { background: var(--bg-soft); }
 .nav a.active { background: #0d0d0d; color: #fff; border-color: #0d0d0d; }
 .badge-count {
@@ -195,11 +207,19 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 
 html[dir="rtl"] .tbl th, html[dir="rtl"] .tbl td { text-align: right; }
 
 .drop {
+  display: block; position: relative;
   border: 2px dashed #a3a3a3; border-radius: 16px; background: #f7f7f7;
   padding: 26px 18px; text-align: center; color: var(--muted); transition: .15s;
   cursor: pointer; min-height: 120px;
 }
 .drop.over { border-color: #0d0d0d; border-style: solid; background: #ececec; color: #0d0d0d; }
+/* Transparent native file input covering the whole dropzone: taps land directly
+   on the real control (no synthetic .click() needed), so picking works in
+   every browser incl. hardened ones. The box visuals stay underneath. */
+.file-overlay {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer; margin: 0;
+}
 .file-item { display: flex; gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
 .file-item .grow { flex: 1; min-width: 0; }
 .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

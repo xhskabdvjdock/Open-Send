@@ -67,15 +67,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <nav className="nav" aria-label="Main">
             {!isAuthPage && !isAdminArea && !isTeacherArea &&
               links.map((l) => (
-                <Link key={l.href} href={l.href} className={pathname === l.href ? 'active' : ''}>
+                <Link key={l.href} href={l.href} className={pathname === l.href ? 'active' : ''} aria-label={l.label}>
                   {l.icon}
-                  <span className="hide-mobile">{l.label}</span>
+                  <span className="nav-label">{l.label}</span>
                   {typeof l.badge === 'number' && l.badge > 0 && <span className="badge-count">{l.badge > 99 ? '99+' : l.badge}</span>}
                 </Link>
               ))}
           </nav>
         </div>
-        <style>{`@media (max-width: 859px){ .hide-mobile{ display:none; } .nav a{ padding:9px 10px; } }`}</style>
+        <style>{`@media (max-width: 859px){ .topbar .nav{ display:none; } }`}</style>
       </header>
       <main className="container page">{children}</main>
       {!isAuthPage && !isAdminArea && !isTeacherArea && (

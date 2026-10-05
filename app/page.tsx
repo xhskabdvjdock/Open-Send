@@ -34,9 +34,8 @@ export default function HomePage() {
           setLoading(false);
           return;
         }
-        const [a, b, c] = await Promise.all([
-          fetch('/api/transfers/mine?type=received&status=PENDING&limit=1', { cache: 'no-store' }).then((x) => x.json()).catch(() => ({ transfers: [] })),
-          fetch('/api/transfers/mine?type=sent&limit=1', { cache: 'no-store' }).then((x) => x.json()).catch(() => ({ transfers: [] })),
+        // Unread badge needs only the count endpoint (single roundtrip).
+        const [c] = await Promise.all([
           fetch('/api/notifications/unread-count', { cache: 'no-store' }).then((x) => x.json()).catch(() => ({ unread: 0 })),
         ]);
         // Counts need real totals — fetch lightweight lists (limit 200 is fine for school scale)
@@ -47,7 +46,6 @@ export default function HomePage() {
           fetch('/api/folders', { cache: 'no-store' }).then((x) => x.json()).catch(() => ({ folders: [] })),
         ]);
         setFolders((fl.folders || []).slice(0, 6));
-        void a; void b; void c;
         setCounts({
           pending: (p.transfers || []).length,
           sent: (s.transfers || []).length,

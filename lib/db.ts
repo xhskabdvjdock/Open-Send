@@ -23,7 +23,7 @@ const REMOVED_DEFAULT_CLASSES = [
 ];
 
 export const TEACHER_SETTINGS_DEFAULTS: Record<string, string> = {
-  allowTeacherDeleteFolders: 'false',
+  allowTeacherDeleteFolders: 'true',
   zipRetentionMinutes: '60',
 };
 
@@ -48,7 +48,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   retentionCompletedDays: '30',
   autoDeleteExpired: 'true',
   adminCanPreview: 'false',
-  allowTeacherDeleteFolders: 'false',
+  allowTeacherDeleteFolders: 'true',
   zipRetentionMinutes: '60',
 };
 
@@ -61,6 +61,11 @@ function migrate(db: DatabaseSync): void {
   } catch {}
   try {
     db.exec('PRAGMA synchronous = NORMAL;');
+  } catch {}
+  // Wait (instead of instantly failing) when many students write at once
+  // (e.g. mass submissions before a deadline). Writers still serialize fast.
+  try {
+    db.exec('PRAGMA busy_timeout = 5000;');
   } catch {}
   db.exec(`
     CREATE TABLE IF NOT EXISTS classes (
@@ -250,6 +255,19 @@ function migrate(db: DatabaseSync): void {
   } catch {}
   try {
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_teacher ON sessions(teacherId);');
+  } catch {}
+  // One-time: permanent folder deletion used to default to disabled, which made
+  // the typed-name confirmation always fail. Align existing installs with the new
+  // default exactly once (later admin toggles are never touched again).
+  try {
+    const done = db.prepare("SELECT value FROM system_settings WHERE key = 'deleteDefaultMigrated'").get() as unknown as { value: string } | undefined;
+    if (!done) {
+      const cur = db.prepare("SELECT value FROM system_settings WHERE key = 'allowTeacherDeleteFolders'").get() as unknown as { value: string } | undefined;
+      if (cur && cur.value === 'false') {
+        db.prepare("UPDATE system_settings SET value = 'true', updatedAt = ? WHERE key = 'allowTeacherDeleteFolders'").run(new Date().toISOString());
+      }
+      db.prepare("INSERT OR IGNORE INTO system_settings(key, value, updatedAt) VALUES ('deleteDefaultMigrated', '1', ?)").run(new Date().toISOString());
+    }
   } catch {}
 }
 

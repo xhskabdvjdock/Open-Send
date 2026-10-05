@@ -1,14 +1,16 @@
 {
   "name": "open-send",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Open Send — local school file-sharing web app (Next.js + SQLite + local storage)",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 80",
-    "start:lan": "next start -H 0.0.0.0 -p 80",
-    "start:3000": "next start -H 0.0.0.0 -p 3000",
+    "start": "node scripts/network-check.mjs && next start -H 0.0.0.0 -p 80",
+    "start:lan": "node scripts/network-check.mjs && next start -H 0.0.0.0 -p 80",
+    "start:3000": "node scripts/network-check.mjs --port=3000 && next start -H 0.0.0.0 -p 3000",
+    "network:check": "node scripts/network-check.mjs",
+    "setup:lan": "node scripts/network-check.mjs",
     "lint": "next lint"
   },
   "dependencies": {

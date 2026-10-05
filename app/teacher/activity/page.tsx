@@ -3,13 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ScrollText, Bell } from 'lucide-react';
-import { useT } from '@/lib/i18n';
+import { useT, translateNotification } from '@/lib/i18n';
 import { Loading } from '@/components/feedback';
 import { TeacherNav } from '@/components/TeacherNav';
 
 export default function TeacherActivityPage() {
   const router = useRouter();
-  const { t } = useT();
+  const { t, lang } = useT();
   const [items, setItems] = useState<{ id: number; action: string; details: string; createdAt: string }[]>([]);
   const [notifs, setNotifs] = useState<{ id: string; title: string; body: string; createdAt: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,15 +49,18 @@ export default function TeacherActivityPage() {
           <h3><Bell size={16} /> {t('notifications')}</h3>
           {notifs.length === 0 ? <p className="muted small">{t('noNotifications')}</p> : (
             <div className="grid">
-              {notifs.map((n) => (
+              {notifs.map((n) => {
+                const nt = translateNotification(n.title, n.body || '', lang, 'teacher');
+                return (
                 <div key={n.id} className="file-item">
                   <div className="grow">
-                    <b>{n.title}</b>
-                    <div className="small muted">{n.body?.slice(0, 160)}</div>
+                    <b>{nt.title}</b>
+                    <div className="small muted">{nt.body?.slice(0, 160)}</div>
                     <div className="small muted">{String(n.createdAt).slice(0, 16).replace('T', ' ')}</div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

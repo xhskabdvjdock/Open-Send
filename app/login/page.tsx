@@ -57,6 +57,9 @@ export default function LoginPage() {
         <p className="small mt">
           <Link href="/register">{t('register')}</Link>
         </p>
+        <p className="muted small mt" style={{ textAlign: 'center' }}>
+          Open Send · {t('netLocalNet')} · <span dir="ltr">btec-send.local</span>
+        </p>
       </div>
     </div>
   );

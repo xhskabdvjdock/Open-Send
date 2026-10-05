@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { getStudentFromToken, STUDENT_COOKIE, getCookieFromHeader } from '@/lib/auth';
 import { dbReady } from '@/lib/db';
@@ -56,8 +57,16 @@ export async function POST(req: Request) {
   const allowedExts = parseCsvList(settings.allowedExtensions);
   const blockedExts = parseCsvList(settings.blockedExtensions);
 
-  // Validate all files first before writing anything.
-  const prepared: { file: File; safeName: string; ext: string; buf: Buffer; mime: string }[] = [];
+  // Gross-size guard BEFORE buffering: reject absurd bodies without loading
+  // gigabytes into memory first (per-file checks below stay authoritative).
+  const contentLength = Number(req.headers.get('content-length') || 0);
+  const grossCap = settings.maxFilesPerTransfer * maxBytes + 32 * 1024 * 1024;
+  if (Number.isFinite(contentLength) && contentLength > 0 && contentLength > grossCap) {
+    return err(`Upload exceeds the total size limit.`, 413);
+  }
+
+  // Validate metadata of all files first (no bytes buffered yet).
+  const prepared: { file: File; safeName: string; ext: string; size: number; mime: string }[] = [];
   let total = 0;
   for (const f of files) {
     const safeName = sanitizeOriginalName((f as File).name || 'file');
@@ -70,9 +79,7 @@ export async function POST(req: Request) {
       return err(`File type ".${ext || '?'}" is not allowed.`, 400);
     }
     total += size;
-    const buf = Buffer.from(await (f as File).arrayBuffer());
-    if (buf.length !== size && buf.length === 0) return err(`File "${safeName}" could not be read.`, 400);
-    prepared.push({ file: f as File, safeName, ext, buf, mime: (f as File).type || MIME_FALLBACK });
+    prepared.push({ file: f as File, safeName, ext, size, mime: (f as File).type || MIME_FALLBACK });
   }
 
   // Persist: transfer row + files on disk (pending bucket) atomically-ish.
@@ -89,18 +96,27 @@ export async function POST(req: Request) {
     const insFile = db.prepare(
       'INSERT INTO transfer_files(id, transferId, storedFile, originalName, mime, size, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
+    // Stream through files ONE AT A TIME (read → write → release) so peak
+    // memory is one file, not the whole batch — and use async writes so a big
+    // file never blocks the event loop for other students.
     for (const p of prepared) {
+      const buf = Buffer.from(await p.file.arrayBuffer());
+      if (buf.length === 0) {
+        throw new Error(`unreadable:${p.safeName}`);
+      }
       const storedFile = newId();
       const dest = path.join(storageSubdir('pending'), storedFile);
-      fs.writeFileSync(dest, p.buf);
+      await writeFile(dest, buf);
       written.push(dest);
-      insFile.run(newId(), transferId, storedFile, p.safeName, p.mime.slice(0, 120), p.buf.length, now);
+      insFile.run(newId(), transferId, storedFile, p.safeName, p.mime.slice(0, 120), buf.length, now);
     }
   } catch (e) {
     for (const w of written) {
       try { fs.unlinkSync(w); } catch {}
     }
     try { db.prepare('DELETE FROM transfers WHERE id = ?').run(transferId); } catch {}
+    const msg = e instanceof Error ? e.message : '';
+    if (msg.startsWith('unreadable:')) return err(`File "${msg.slice(11)}" could not be read.`, 400);
     return err('Upload failed. Please try again.', 500);
   }
 

@@ -39,6 +39,7 @@ const dict = {
     messagePlaceholder: 'Write a note for the recipient...',
     sendButton: 'Send File',
     dragDrop: 'Drag files here or click to choose',
+    dragHintFallback: 'If tapping does not add the file, drag & drop it here instead.',
     chooseFiles: 'Choose Files',
     pending: 'Pending',
     accepted: 'Accepted',
@@ -236,6 +237,43 @@ const dict = {
     syCurrent: 'Current',
     syNew: 'New (min 8)',
     syChange: 'Change',
+    netTitle: 'Network',
+    netStatus: 'Status',
+    netOnline: 'Online',
+    netLocalAddress: 'Local Address',
+    netIpAddress: 'IP Address',
+    netPort: 'Port',
+    netMdns: 'mDNS',
+    netActive: 'Active',
+    netUnavailable: 'Unavailable',
+    netFallback: 'Fallback',
+    netCopyAddress: 'Copy Address',
+    netCopied: 'Address copied.',
+    netQrCode: 'QR code (scan with a phone)',
+    netHowTitle: 'To connect another device:',
+    netHow1: 'Connect it to the same local network.',
+    netHow2: 'Open a browser.',
+    netHow3: 'Go to:',
+    netCopyDiag: 'Copy Diagnostics',
+    netDiagCopied: 'Diagnostics copied.',
+    netOpenDiag: 'Open network diagnostics',
+    netDiagTitle: 'Network Diagnostics',
+    netServerIp: 'Server IP',
+    netHostname: 'Hostname',
+    netHttp: 'HTTP Server',
+    netFirewall: 'Firewall',
+    netLocalAccess: 'Local Access',
+    netWorking: 'Working',
+    netNotWorking: 'Not working',
+    netConfigured: 'Configured',
+    netMissing: 'Missing',
+    netUnknown: 'Unknown',
+    netDetectedIp: 'Detected IP',
+    netExpectedIp: 'Expected IP',
+    netBackToAdmin: 'Back to admin',
+    netWarnIp: 'Expected IP not found on this machine — hostname may not work.',
+    netWarnMdns: 'Hostname could not be resolved. The server still works via IP.',
+    netLocalNet: 'Local Network',
     dlgConfirm: 'Confirm',
     dlgCancel: 'Cancel',
     errOffline: 'Server offline. Make sure you are on the school network.',
@@ -261,6 +299,8 @@ const dict = {
     errNoFile: 'Please choose at least one file.',
     errTooMany: 'Too many files for one transfer.',
     errTooBig: 'A file exceeds the maximum size.',
+    errPickFail: 'No file was received. Please try again, or open Open Send in Chrome (Android) / Safari (iPhone) to upload.',
+    openInBrowserHint: 'Uploads may not work inside chat apps - open this page in Chrome (Android) or Safari (iPhone).',
     errBlocked: 'This file type is blocked by the administrator.',
     errNotAllowedExt: 'This file type is not allowed.',
     errEmptyFile: 'The file is empty.',
@@ -293,6 +333,7 @@ const dict = {
     delClassMsg: 'Delete this class?',
     delTransferMsg: 'Delete this transfer and its files permanently?',
     delFileMsg: 'Delete this file?',
+    errDeleteDisabled: 'Permanent deletion is disabled by the administrator. Archive the folder instead.',
     restoreMsg: 'Current data will be backed up first.',
     needTarget: 'Choose a class to move the students to first.',
     tmpPwPh: 'Temporary password (min 6 chars)',
@@ -413,6 +454,7 @@ const dict = {
     messagePlaceholder: 'اكتب ملاحظة للمستلم...',
     sendButton: 'إرسال الملف',
     dragDrop: 'اسحب الملفات هنا أو انقر للاختيار',
+    dragHintFallback: 'إذا لم تُضَف الملفات بالضغط، اسحبها وأفلتها هنا.',
     chooseFiles: 'اختيار الملفات',
     pending: 'معلق',
     accepted: 'مقبول',
@@ -610,6 +652,43 @@ const dict = {
     syCurrent: 'الحالية',
     syNew: 'الجديدة (8 أحرف على الأقل)',
     syChange: 'تغيير',
+    netTitle: 'الشبكة',
+    netStatus: 'الحالة',
+    netOnline: 'متصل',
+    netLocalAddress: 'العنوان المحلي',
+    netIpAddress: 'عنوان IP',
+    netPort: 'المنفذ',
+    netMdns: 'mDNS',
+    netActive: 'نشط',
+    netUnavailable: 'غير متاح',
+    netFallback: 'البديل',
+    netCopyAddress: 'نسخ العنوان',
+    netCopied: 'تم نسخ العنوان.',
+    netQrCode: 'رمز QR (امسحه بالهاتف)',
+    netHowTitle: 'لتوصيل جهاز آخر:',
+    netHow1: 'صِله بنفس الشبكة المحلية.',
+    netHow2: 'افتح المتصفح.',
+    netHow3: 'انتقل إلى:',
+    netCopyDiag: 'نسخ التشخيص',
+    netDiagCopied: 'تم نسخ التشخيص.',
+    netOpenDiag: 'فتح تشخيص الشبكة',
+    netDiagTitle: 'تشخيص الشبكة',
+    netServerIp: 'IP الخادم',
+    netHostname: 'اسم المضيف',
+    netHttp: 'خادم HTTP',
+    netFirewall: 'جدار الحماية',
+    netLocalAccess: 'الوصول المحلي',
+    netWorking: 'يعمل',
+    netNotWorking: 'لا يعمل',
+    netConfigured: 'مُعد',
+    netMissing: 'ناقص',
+    netUnknown: 'غير معروف',
+    netDetectedIp: 'IP المكتشف',
+    netExpectedIp: 'IP المتوقع',
+    netBackToAdmin: 'عودة للإدارة',
+    netWarnIp: 'IP المتوقع غير موجود على هذا الجهاز — قد لا يعمل اسم المضيف.',
+    netWarnMdns: 'تعذّر حل اسم المضيف. الخادم ما زال يعمل عبر IP.',
+    netLocalNet: 'الشبكة المحلية',
     dlgConfirm: 'تأكيد',
     dlgCancel: 'تراجع',
     errOffline: 'الخادم غير متصل. تأكد من اتصالك بشبكة المدرسة.',
@@ -635,6 +714,8 @@ const dict = {
     errNoFile: 'الرجاء اختيار ملف واحد على الأقل.',
     errTooMany: 'عدد الملفات يتجاوز الحد المسموح.',
     errTooBig: 'ملف يتجاوز الحد الأقصى للحجم.',
+    errPickFail: 'لم يتم استلام أي ملف. حاول مجدداً، أو افتح Open Send في Chrome (أندرويد) / Safari (آيفون) للرفع.',
+    openInBrowserHint: 'قد لا يعمل الرفع داخل تطبيقات المحادثة - افتح هذه الصفحة في Chrome (أندرويد) أو Safari (آيفون).',
     errBlocked: 'نوع الملف محظور من الإدارة.',
     errNotAllowedExt: 'نوع الملف غير مسموح.',
     errEmptyFile: 'الملف فارغ.',
@@ -667,6 +748,7 @@ const dict = {
     delClassMsg: 'حذف هذا الصف؟',
     delTransferMsg: 'حذف هذا التحويل وملفاته نهائياً؟',
     delFileMsg: 'حذف هذا الملف؟',
+    errDeleteDisabled: 'الحذف النهائي معطّل من الإدارة. استخدم الأرشفة بدلاً منه.',
     restoreMsg: 'سيتم نسخ البيانات الحالية احتياطياً أولاً.',
     needTarget: 'اختر صفاً لنقل الطلاب إليه أولاً.',
     tmpPwPh: 'كلمة مرور مؤقتة (6 أحرف على الأقل)',
@@ -814,6 +896,7 @@ const exactErrorMap: Record<string, TKey> = {
   'Backup validation failed.': 'errBackupInvalid',
   'Backup validation failed: not an Open Send database.': 'errBackupInvalid',
   'Invalid backup file.': 'errBackupInvalid',
+  'Permanent deletion is disabled. Archive the folder instead.': 'errDeleteDisabled',
   'Invalid reassign target.': 'errInvalid',
   'Invalid sendScope.': 'errInvalid',
   'Invalid classRestrictions JSON.': 'errInvalid',
@@ -907,6 +990,56 @@ export function useT(): { lang: Lang; setLang: (l: Lang) => void; t: (k: TKey) =
   return useContext(Ctx);
 }
 
+// Notification contents are stored in English (server-rendered at creation).
+// This re-renders the KNOWN templates in Arabic at display time, preserving
+// names/counts/folders. Free-text bodies (student messages) pass through
+// untouched, as does anything unrecognized (old or custom texts).
+// ctx: student notification `kind`, or 'teacher' on teacher screens.
+export function translateNotification(title: string, body: string, lang: Lang, ctx: string): { title: string; body: string } {
+  if (lang !== 'ar') return { title, body };
+  let m: RegExpMatchArray | null;
+  if ((m = title.match(/^You received (\d+) files? from (.+)\.$/))) {
+    return { title: `استلمت ${m[1]} ملفات من ${m[2]}`, body };
+  }
+  if ((m = title.match(/^(.+) accepted your file\.$/))) {
+    return { title: `قبل ${m[1]} ملفك`, body };
+  }
+  // Exact admin strings BEFORE the generic name pattern (they would match it).
+  if (title === 'An administrator cancelled a file sent to you.') {
+    return { title: 'ألغت الإدارة ملفاً مرسلاً إليك', body };
+  }
+  if ((m = title.match(/^(.+) cancelled a file sent to you\.$/))) {
+    return { title: `ألغى ${m[1]} ملفاً مرسلاً إليك`, body };
+  }
+  if ((m = title.match(/^(.+) declined your file\.$/))) {
+    return { title: `رفض ${m[1]} ملفك`, body };
+  }
+  if (title === 'An administrator cancelled your transfer.') {
+    return { title: 'ألغت الإدارة تحويلك', body };
+  }
+  if (title === 'Your file expired.') {
+    return { title: 'انتهت صلاحية ملفك', body };
+  }
+  if (title === 'A file sent to you expired.') {
+    return { title: 'انتهت صلاحية ملف مرسل إليك', body };
+  }
+  if (title === 'Submission uploaded successfully.') {
+    let b = body;
+    if (ctx === 'submission' && (m = body.match(/^(.+) - (\d+) files?$/))) {
+      b = `${m[1]} - ${m[2]} ملفات`;
+    }
+    return { title: 'تم رفع التسليم بنجاح', body: b };
+  }
+  if ((m = title.match(/^New submission: (.+)$/))) {
+    let b = body;
+    const bm = body.match(/^(.+) submitted (\d+) files? \((\d+) KB\)$/);
+    if (ctx === 'teacher' && bm) {
+      b = `سلّم ${bm[1]} ${bm[2]} ملفات (${bm[3]} ك.ب)`;
+    }
+    return { title: `تسليم جديد: ${m[1]}`, body: b };
+  }
+  return { title, body };
+}
 export function LanguageSwitcher(): React.JSX.Element {
   const { lang, setLang } = useT();
   return (

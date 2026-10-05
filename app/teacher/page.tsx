@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { FolderOpen, Inbox, Clock, Users, HardDrive, Bell } from 'lucide-react';
-import { useT } from '@/lib/i18n';
+import { useT, translateNotification } from '@/lib/i18n';
 import { Loading } from '@/components/feedback';
 import { TeacherNav } from '@/components/TeacherNav';
 import { formatBytes } from '@/lib/validation';
 
 export default function TeacherDashboard() {
   const router = useRouter();
-  const { t } = useT();
+  const { t, lang } = useT();
   const [me, setMe] = useState<{ displayName: string; username: string } | null>(null);
   const [stats, setStats] = useState<Record<string, number> | null>(null);
   const [notifs, setNotifs] = useState<{ id: string; title: string; body: string; createdAt: string; folderName?: string }[]>([]);
@@ -75,14 +75,17 @@ export default function TeacherDashboard() {
           <h3><Bell size={16} /> {t('notifications')} {stats && stats.unread > 0 ? <span className="badge-count">{stats.unread}</span> : null}</h3>
           {notifs.length === 0 ? <p className="muted small">{t('noNotifications')}</p> : (
             <div className="grid">
-              {notifs.map((n) => (
+              {notifs.map((n) => {
+                const nt = translateNotification(n.title, n.body || '', lang, 'teacher');
+                return (
                 <div key={n.id} className="file-item">
                   <div className="grow">
-                    <b>{n.title}</b>
-                    <div className="small muted">{n.body?.slice(0, 120)} · {String(n.createdAt).slice(0, 16).replace('T', ' ')}</div>
+                    <b>{nt.title}</b>
+                    <div className="small muted">{nt.body?.slice(0, 120)} · {String(n.createdAt).slice(0, 16).replace('T', ' ')}</div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
           <Link href="/teacher/activity" className="btn btn-sm mt">{t('activity')}</Link>

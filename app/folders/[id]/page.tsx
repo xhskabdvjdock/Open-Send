@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { UploadCloud, X, File as FileIcon, Send, Download, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { X, File as FileIcon, Send, Download, Trash2 } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { Loading } from '@/components/feedback';
+import { FileDropzone } from '@/components/FileDropzone';
 import { formatBytes } from '@/lib/validation';
 
 export default function StudentFolderDetail({ params }: { params: { id: string } }) {
@@ -20,7 +21,16 @@ export default function StudentFolderDetail({ params }: { params: { id: string }
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Chat-app in-built browsers (WhatsApp/Facebook/...) often break file
+  // selection entirely — warn once so the student opens Chrome/Safari instead.
+  const inAppBrowser = useMemo(() => {
+    try {
+      const ua = navigator.userAgent || '';
+      return /WhatsApp|FBAN|FBAV|Instagram|Line\/|;\s?wv\)/i.test(ua);
+    } catch {
+      return false;
+    }
+  }, []);
 
   async function load() {
     try {
@@ -48,9 +58,9 @@ export default function StudentFolderDetail({ params }: { params: { id: string }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  function addFiles(list: FileList | File[]) {
+  function addFiles(list: File[]) {
     const max = Number((folder as { maxFiles?: number })?.maxFiles || 5);
-    setFiles((prev) => [...prev, ...Array.from(list)].slice(0, max));
+    setFiles((prev) => [...prev, ...list].slice(0, max));
   }
 
   function submit() {
@@ -140,18 +150,8 @@ export default function StudentFolderDetail({ params }: { params: { id: string }
         </p>
 
         <label className="lbl">{t('uploadFiles')} <span className="hint">(max {maxFilesN} · {maxSizeN} MB)</span></label>
-        <div
-          className="drop"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); }}
-          onClick={() => inputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-        >
-          <UploadCloud size={26} />
-          <div style={{ fontWeight: 700, marginTop: 6 }}>{t('dragDrop')}</div>
-          <input ref={inputRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} />
-        </div>
+        <FileDropzone inputId="folder-files" onPick={addFiles} />
+        {inAppBrowser && <p className="hint small mt">{t('openInBrowserHint')}</p>}
         <div className="grid mt">
           {files.map((f, i) => (
             <div key={i} className="file-item">

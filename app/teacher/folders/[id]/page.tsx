@@ -113,7 +113,8 @@ export default function TeacherFolderDetail({ params }: { params: { id: string }
   async function removeFolder() {
     const name = await askPrompt({ title: t('deleteFolderConfirm'), placeholder: folder?.name || '', okLabel: t('del') });
     if (name === null) return;
-    if (name.trim() !== folder?.name) {
+    const norm = (s: string) => s.trim().replace(/\s+/g, ' ');
+    if (norm(name) !== norm(String(folder?.name || ''))) {
       setMsg(te('Type the folder name to confirm deletion.'));
       return;
     }

@@ -131,7 +131,10 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   const settings = getSettings();
   if (permanent) {
     if (!settings.allowTeacherDeleteFolders) return err('Permanent deletion is disabled. Archive the folder instead.', 403);
-    if (confirmName !== f.name) return err('Type the folder name to confirm deletion.', 400);
+    // Compare whitespace-tolerant (collapse inner gaps) so an exact-looking
+    // typed name is not rejected over double spaces.
+    const norm = (s: string) => s.trim().replace(/\s+/g, ' ');
+    if (norm(confirmName) !== norm(f.name)) return err('Type the folder name to confirm deletion.', 400);
     // Delete physical submission files
     try {
       const files = db.prepare('SELECT sf.storedFile FROM submission_files sf JOIN submissions s ON s.id = sf.submissionId WHERE s.folderId = ?').all(params.id) as unknown as { storedFile: string }[];

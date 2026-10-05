@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, UploadCloud, X, File as FileIcon, Check, FolderOpen, User } from 'lucide-react';
+import { Search, X, File as FileIcon, Check, FolderOpen, User } from 'lucide-react';
 import { useT } from '@/lib/i18n';
+import { FileDropzone } from '@/components/FileDropzone';
 import { formatBytes } from '@/lib/validation';
 
 interface Student { id: string; username: string; displayName: string; classId: string | null; className: string | null }
@@ -21,7 +22,6 @@ export default function SendPage() {
   const [recipient, setRecipient] = useState<Student | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [message, setMessage] = useState('');
-  const [dragOver, setDragOver] = useState(false);
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -29,7 +29,16 @@ export default function SendPage() {
   const [limits, setLimits] = useState({ maxFileSizeMB: 50, maxFilesPerTransfer: 5 });
   const [mode, setMode] = useState<'student' | 'folder'>('student');
   const [teacherFolders, setTeacherFolders] = useState<{ id: string; name: string; teacherName: string; deadline: string | null }[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Chat-app in-built browsers (WhatsApp/Facebook/...) often break file
+  // selection entirely — warn once so the student opens Chrome/Safari instead.
+  const inAppBrowser = useMemo(() => {
+    try {
+      const ua = navigator.userAgent || '';
+      return /WhatsApp|FBAN|FBAV|Instagram|Line\/|;\s?wv\)/i.test(ua);
+    } catch {
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     fetch('/api/folders', { cache: 'no-store' }).then((r) => r.json()).then((j) => setTeacherFolders(j.folders || [])).catch(() => {});
@@ -61,9 +70,8 @@ export default function SendPage() {
     return () => clearTimeout(id);
   }, [q, classFilter]);
 
-  function addFiles(list: FileList | File[]) {
-    const arr = Array.from(list);
-    setFiles((prev) => [...prev, ...arr].slice(0, limits.maxFilesPerTransfer));
+  function addFiles(list: File[]) {
+    setFiles((prev) => [...prev, ...list].slice(0, limits.maxFilesPerTransfer));
   }
 
   function send() {
@@ -199,26 +207,8 @@ export default function SendPage() {
         )}
 
         <label className="lbl">{t('files')} <span className="hint">(max {limits.maxFilesPerTransfer} · {limits.maxFileSizeMB} MB each)</span></label>
-        <div
-          className={`drop ${dragOver ? 'over' : ''}`}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); }}
-          onClick={() => inputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-        >
-          <UploadCloud size={26} />
-          <div style={{ fontWeight: 700, marginTop: 6 }}>{t('dragDrop')}</div>
-          <div className="small">{t('chooseFiles')}</div>
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            hidden
-            onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }}
-          />
-        </div>
+        <FileDropzone inputId="send-files" onPick={addFiles} />
+        {inAppBrowser && <p className="hint small mt">{t('openInBrowserHint')}</p>}
 
         <div className="grid mt">
           {files.map((f, i) => (
