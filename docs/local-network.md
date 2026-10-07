@@ -265,8 +265,10 @@ a working address immediately.
   local development only.
 - **CORS/origins:** no CORS config exists (same-origin app) — `http://btec-send.local`
   works without opening anything up, and CORS was deliberately not set to `*`.
-- **Real-time:** no WebSockets/Socket.IO/SSE — notifications poll via relative
-  `fetch` every 20s, which is hostname-agnostic.
+- **Real-time:** student chat streams over SSE on the same origin and port
+  (`/api/chat/stream`, existing session cookie, no extra firewall ports) —
+  works on the local hostname with zero extra setup. Other notifications still
+  poll via relative `fetch` every 20s, which is hostname-agnostic.
 - **Uploads/downloads:** multipart POST + authenticated GET through API routes —
   verified hostname-agnostic; storage layout (`storage/pending|accepted|…`) untouched.
 - **Auth:** `HttpOnly` + `SameSite=Lax` cookies without a `Domain` attribute work

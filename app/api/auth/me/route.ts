@@ -10,6 +10,7 @@ export async function GET(req: Request) {
   const sess = await getStudentFromToken(token);
   if (!sess) return err('Unauthorized', 401);
   const s = getSettings();
+  const hasAvatar = !!((sess.user as unknown as { avatarFile?: string }).avatarFile);
   return json({
     user: {
       id: sess.user.id,
@@ -22,5 +23,9 @@ export async function GET(req: Request) {
     },
     maintenanceMode: s.maintenanceMode,
     allowClassChange: s.allowClassChange,
+    hasAvatar,
+    allowAvatarUpload: s.allowAvatarUpload,
+    allowUsernameChange: s.allowUsernameChange,
+    maxAvatarMB: s.maxAvatarMB,
   });
 }

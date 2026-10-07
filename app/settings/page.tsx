@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Sun, Moon, LogOut, User, Check } from 'lucide-react';
+import { Sun, Moon, LogOut, User, Check, Bell } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import { Loading } from '@/components/feedback';
@@ -14,6 +14,35 @@ export default function SettingsPage() {
   const { theme, toggle } = useTheme();
   const [me, setMe] = useState<{ displayName: string; username: string; className: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notifyOn, setNotifyOn] = useState(false);
+
+  useEffect(() => {
+    try {
+      setNotifyOn(localStorage.getItem('opensend-chat-notify') === '1');
+    } catch {}
+  }, []);
+
+  async function toggleNotify() {
+    if (!notifyOn) {
+      // Ask permission ONLY on explicit enable (default stays OFF).
+      try {
+        if (!('Notification' in window)) return;
+        const p = await Notification.requestPermission();
+        if (p !== 'granted') return;
+      } catch {
+        return;
+      }
+      try {
+        localStorage.setItem('opensend-chat-notify', '1');
+      } catch {}
+      setNotifyOn(true);
+    } else {
+      try {
+        localStorage.setItem('opensend-chat-notify', '0');
+      } catch {}
+      setNotifyOn(false);
+    }
+  }
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
@@ -86,6 +115,16 @@ export default function SettingsPage() {
       </div>
 
       <div className="card">
+        <h3><Bell size={16} style={{ verticalAlign: -3 }} /> {t('notifications')}</h3>
+        <div className="row">
+          <button type="button" className={`btn ${notifyOn ? 'btn-primary' : ''}`} onClick={toggleNotify} aria-pressed={notifyOn}>
+            {notifyOn && <Check size={15} />} {t('seChatNotify')}
+          </button>
+        </div>
+        <p className="hint mt">{t('seChatNotifyHint')}</p>
+      </div>
+
+      <div className="card">
         <h3>{t('account')}</h3>
         {me && (
           <dl className="kv">
@@ -106,7 +145,7 @@ export default function SettingsPage() {
 
       <div className="card">
         <h3>{t('aboutApp')}</h3>
-        <p className="muted small" style={{ margin: 0 }}>Open Send · {t('tagline')} · v1.0.0</p>
+        <p className="muted small" style={{ margin: 0 }}>Open Send · {t('tagline')} · v1.2.0</p>
       </div>
     </div>
   );

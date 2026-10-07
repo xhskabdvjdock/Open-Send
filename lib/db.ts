@@ -29,7 +29,7 @@ export const TEACHER_SETTINGS_DEFAULTS: Record<string, string> = {
 
 export const DEFAULT_SETTINGS: Record<string, string> = {
   appName: 'Open Send',
-  appVersion: '1.1.0',
+  appVersion: '1.2.0',
   registrationEnabled: 'true',
   maintenanceMode: 'false',
   allowClassChange: 'false',
@@ -50,6 +50,25 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   adminCanPreview: 'false',
   allowTeacherDeleteFolders: 'true',
   zipRetentionMinutes: '60',
+  // Student chat (v1.2.0)
+  chatEnabled: 'true',
+  chatStudentChat: 'true',
+  chatTeacherChat: 'false',
+  chatMaxLength: '2000',
+  chatAttachments: 'true',
+  chatMaxAttachmentMB: '25',
+  chatModeration: 'true',
+  chatDefaultSuspensionMinutes: '10',
+  chatRateMax: '20',
+  chatRateWindowMinutes: '1',
+  chatShowOnline: 'true',
+  chatShowLastSeen: 'true',
+  chatBrowserNotify: 'false',
+  allowAvatarUpload: 'true',
+  allowUsernameChange: 'true',
+  maxAvatarMB: '2',
+  libraryEnabled: 'true',
+  maxLibraryFileMB: '200',
 };
 
 function migrate(db: DatabaseSync): void {
@@ -245,6 +264,84 @@ function migrate(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_sub_teacher ON submissions(teacherId);
     CREATE INDEX IF NOT EXISTS idx_sfiles_sub ON submission_files(submissionId);
     CREATE INDEX IF NOT EXISTS idx_tnotif_teacher ON teacher_notifications(teacherId, isRead, createdAt);
+    -- Student chat (v1.2.0). kind on conversations is reserved for future
+    -- group support ('direct' only for now); attachment columns are reserved
+    -- for the separable attachments layer (text chat works without them).
+    CREATE TABLE IF NOT EXISTS conversations (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL DEFAULT 'direct',
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS conversation_participants (
+      conversationId TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      lastReadAt TEXT NOT NULL DEFAULT '',
+      joinedAt TEXT NOT NULL,
+      PRIMARY KEY (conversationId, userId)
+    );
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      conversationId TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      senderId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL DEFAULT 'text',
+      content TEXT NOT NULL DEFAULT '',
+      attachmentFile TEXT NOT NULL DEFAULT '',
+      attachmentName TEXT NOT NULL DEFAULT '',
+      attachmentMime TEXT NOT NULL DEFAULT '',
+      attachmentSize INTEGER NOT NULL DEFAULT 0,
+      moderationStatus TEXT NOT NULL DEFAULT 'VISIBLE',
+      clientId TEXT NOT NULL DEFAULT '',
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      deletedAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS chat_banned_words (
+      id TEXT PRIMARY KEY,
+      word TEXT NOT NULL,
+      matchType TEXT NOT NULL DEFAULT 'whole',
+      suspensionMinutes INTEGER NOT NULL DEFAULT 10,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      hitCount INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS chat_suspensions (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      startsAt TEXT NOT NULL,
+      endsAt TEXT NOT NULL,
+      reason TEXT NOT NULL DEFAULT '',
+      ruleId TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      createdBy TEXT NOT NULL DEFAULT '',
+      createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS chat_moderation_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      conversationId TEXT NOT NULL DEFAULT '',
+      ruleId TEXT NOT NULL DEFAULT '',
+      matchedWord TEXT NOT NULL DEFAULT '',
+      action TEXT NOT NULL DEFAULT '',
+      suspensionId TEXT NOT NULL DEFAULT '',
+      details TEXT NOT NULL DEFAULT '',
+      createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS chat_presence (
+      userId TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      lastSeenAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_cpart_user ON conversation_participants(userId, conversationId);
+    CREATE INDEX IF NOT EXISTS idx_cpart_conv ON conversation_participants(conversationId);
+    CREATE INDEX IF NOT EXISTS idx_cmsg_conv ON chat_messages(conversationId, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_cmsg_sender ON chat_messages(senderId);
+    CREATE INDEX IF NOT EXISTS idx_cmsg_status ON chat_messages(moderationStatus);
+    CREATE INDEX IF NOT EXISTS idx_cword_enabled ON chat_banned_words(enabled);
+    CREATE INDEX IF NOT EXISTS idx_csusp_user ON chat_suspensions(userId, active, endsAt);
+    CREATE INDEX IF NOT EXISTS idx_cmod_user ON chat_moderation_events(userId, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_cmod_rule ON chat_moderation_events(ruleId, createdAt);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_cmsg_clientid ON chat_messages(clientId) WHERE clientId != '';
     -- sessions.teacherId for teacher auth (added if missing)
   `);
   try {
@@ -268,6 +365,147 @@ function migrate(db: DatabaseSync): void {
       }
       db.prepare("INSERT OR IGNORE INTO system_settings(key, value, updatedAt) VALUES ('deleteDefaultMigrated', '1', ?)").run(new Date().toISOString());
     }
+  } catch {}
+  // App version stamp (ours, not user data): always reflect the running code.
+  try {
+    db.prepare("INSERT INTO system_settings(key, value, updatedAt) VALUES ('appVersion', '1.2.0', ?) ON CONFLICT(key) DO UPDATE SET value = '1.2.0', updatedAt = ?").run(new Date().toISOString(), new Date().toISOString());
+  } catch {}
+  // One-time: chat attachments shipped default-off; the feature is complete now.
+  // Later admin toggles are never touched again.
+  try {
+    const doneA = db.prepare("SELECT value FROM system_settings WHERE key = 'chatAttachDefaultMigrated'").get() as unknown as { value: string } | undefined;
+    if (!doneA) {
+      const curA = db.prepare("SELECT value FROM system_settings WHERE key = 'chatAttachments'").get() as unknown as { value: string } | undefined;
+      if (curA && curA.value === 'false') {
+        db.prepare("UPDATE system_settings SET value = 'true', updatedAt = ? WHERE key = 'chatAttachments'").run(new Date().toISOString());
+      }
+      db.prepare("INSERT OR IGNORE INTO system_settings(key, value, updatedAt) VALUES ('chatAttachDefaultMigrated', '1', ?)").run(new Date().toISOString());
+    }
+  } catch {}
+  // Teacher chat: participants / senders / presence may now be TEACHER ids
+  // (separate table), so the FKs pointing at users() must go. The
+  // conversations() FKs are KEPT (cascade preserved); user/teacher existence
+  // is enforced in route code instead. Data and indexes are preserved.
+  try {
+    const hasUsersFk = (t: string): boolean => {
+      try {
+        const fks = db.prepare(`PRAGMA foreign_key_list(${t})`).all() as unknown as { table: string }[];
+        return fks.some((f) => f.table === 'users');
+      } catch {
+        return false;
+      }
+    };
+    if (hasUsersFk('conversation_participants')) {
+      db.exec(`
+        CREATE TABLE conversation_participants_new (
+          conversationId TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+          userId TEXT NOT NULL,
+          lastReadAt TEXT NOT NULL DEFAULT '',
+          joinedAt TEXT NOT NULL,
+          PRIMARY KEY (conversationId, userId)
+        );
+        INSERT INTO conversation_participants_new(conversationId, userId, lastReadAt, joinedAt)
+          SELECT conversationId, userId, lastReadAt, joinedAt FROM conversation_participants;
+        DROP TABLE conversation_participants;
+        ALTER TABLE conversation_participants_new RENAME TO conversation_participants;
+      `);
+    }
+    if (hasUsersFk('chat_messages')) {
+      db.exec(`
+        CREATE TABLE chat_messages_new (
+          id TEXT PRIMARY KEY,
+          conversationId TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+          senderId TEXT NOT NULL,
+          kind TEXT NOT NULL DEFAULT 'text',
+          content TEXT NOT NULL DEFAULT '',
+          attachmentFile TEXT NOT NULL DEFAULT '',
+          attachmentName TEXT NOT NULL DEFAULT '',
+          attachmentMime TEXT NOT NULL DEFAULT '',
+          attachmentSize INTEGER NOT NULL DEFAULT 0,
+          moderationStatus TEXT NOT NULL DEFAULT 'VISIBLE',
+          clientId TEXT NOT NULL DEFAULT '',
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          deletedAt TEXT
+        );
+        INSERT INTO chat_messages_new(id, conversationId, senderId, kind, content, attachmentFile, attachmentName, attachmentMime, attachmentSize, moderationStatus, clientId, createdAt, updatedAt, deletedAt)
+          SELECT id, conversationId, senderId, kind, content, attachmentFile, attachmentName, attachmentMime, attachmentSize, moderationStatus, clientId, createdAt, updatedAt, deletedAt FROM chat_messages;
+        DROP TABLE chat_messages;
+        ALTER TABLE chat_messages_new RENAME TO chat_messages;
+      `);
+    }
+    if (hasUsersFk('chat_presence')) {
+      db.exec(`
+        CREATE TABLE chat_presence_new (
+          userId TEXT PRIMARY KEY,
+          lastSeenAt TEXT NOT NULL
+        );
+        INSERT INTO chat_presence_new(userId, lastSeenAt) SELECT userId, lastSeenAt FROM chat_presence;
+        DROP TABLE chat_presence;
+        ALTER TABLE chat_presence_new RENAME TO chat_presence;
+      `);
+    }
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_cpart_user ON conversation_participants(userId, conversationId);
+      CREATE INDEX IF NOT EXISTS idx_cpart_conv ON conversation_participants(conversationId);
+      CREATE INDEX IF NOT EXISTS idx_cmsg_conv ON chat_messages(conversationId, createdAt);
+      CREATE INDEX IF NOT EXISTS idx_cmsg_sender ON chat_messages(senderId);
+      CREATE INDEX IF NOT EXISTS idx_cmsg_status ON chat_messages(moderationStatus);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_cmsg_clientid ON chat_messages(clientId) WHERE clientId != '';
+    `);
+  } catch {}
+  // Profile pictures + username policy columns (additive only).
+  try {    const ucols = db.prepare('PRAGMA table_info(users)').all() as unknown as { name: string }[];
+    if (!ucols.some((c) => c.name === 'avatarFile')) {
+      db.exec("ALTER TABLE users ADD COLUMN avatarFile TEXT NOT NULL DEFAULT '';");
+    }
+    const tcols = db.prepare('PRAGMA table_info(teachers)').all() as unknown as { name: string }[];
+    if (!tcols.some((c) => c.name === 'avatarFile')) {
+      db.exec("ALTER TABLE teachers ADD COLUMN avatarFile TEXT NOT NULL DEFAULT '';");
+    }
+  } catch {}
+  try {
+    const cols = db.prepare('PRAGMA table_info(conversation_participants)').all() as unknown as { name: string }[];
+    if (!cols.some((c) => c.name === 'hiddenAt')) {
+      db.exec("ALTER TABLE conversation_participants ADD COLUMN hiddenAt TEXT NOT NULL DEFAULT '';");
+    }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS chat_blocks (
+        blockerId TEXT NOT NULL,
+        blockedId TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        PRIMARY KEY (blockerId, blockedId)
+      );
+      CREATE INDEX IF NOT EXISTS idx_cblock_blocked ON chat_blocks(blockedId);
+    `);
+  } catch {}
+  // School library: books with class targeting (scope 'all' or selected classes).
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS library_books (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        author TEXT NOT NULL DEFAULT '',
+        subject TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        scope TEXT NOT NULL DEFAULT 'all',
+        originalName TEXT NOT NULL DEFAULT '',
+        storedFile TEXT NOT NULL DEFAULT '',
+        mime TEXT NOT NULL DEFAULT 'application/octet-stream',
+        size INTEGER NOT NULL DEFAULT 0,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        downloadCount INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS library_book_classes (
+        bookId TEXT NOT NULL REFERENCES library_books(id) ON DELETE CASCADE,
+        classId TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+        PRIMARY KEY (bookId, classId)
+      );
+      CREATE INDEX IF NOT EXISTS idx_libbooks_enabled ON library_books(enabled, subject);
+      CREATE INDEX IF NOT EXISTS idx_libbook_classes ON library_book_classes(bookId, classId);
+    `);
   } catch {}
 }
 
@@ -373,7 +611,7 @@ export interface ClassRow { id: string; name: string; enabled: number; createdAt
 export interface UserRow {
   id: string; username: string; usernameLower: string; displayName: string;
   passwordHash: string; classId: string | null; enabled: number;
-  createdAt: string; lastLoginAt: string | null;
+  createdAt: string; lastLoginAt: string | null; avatarFile: string;
 }
 export interface AdminRow { id: string; username: string; usernameLower: string; passwordHash: string; createdAt: string }
 export interface TransferRow {
@@ -391,6 +629,7 @@ export interface NotificationRow {
 export interface TeacherRow {
   id: string; username: string; usernameLower: string; displayName: string;
   passwordHash: string; enabled: number; createdAt: string; lastLoginAt: string | null;
+  avatarFile: string;
 }
 export interface SubmissionFolderRow {
   id: string; teacherId: string; name: string; description: string; status: string;
@@ -406,6 +645,34 @@ export interface SubmissionRow {
 export interface SubmissionFileRow {
   id: string; submissionId: string; storedFile: string; originalName: string;
   mime: string; size: number; createdAt: string;
+}
+
+// ---------- Student chat (v1.2.0) ----------
+export interface ConversationRow { id: string; kind: string; createdAt: string; updatedAt: string }
+export interface ConversationParticipantRow { conversationId: string; userId: string; lastReadAt: string; joinedAt: string }
+export interface ChatMessageRow {
+  id: string; conversationId: string; senderId: string; kind: string; content: string;
+  attachmentFile: string; attachmentName: string; attachmentMime: string; attachmentSize: number;
+  moderationStatus: string; clientId: string; createdAt: string; updatedAt: string; deletedAt: string | null;
+}
+export interface ChatBannedWordRow {
+  id: string; word: string; matchType: string; suspensionMinutes: number; enabled: number;
+  hitCount: number; createdAt: string; updatedAt: string;
+}
+export interface ChatSuspensionRow {
+  id: string; userId: string; startsAt: string; endsAt: string; reason: string;
+  ruleId: string | null; active: number; createdBy: string; createdAt: string;
+}
+export interface ChatModerationEventRow {
+  id: number; userId: string; conversationId: string; ruleId: string; matchedWord: string;
+  action: string; suspensionId: string; details: string; createdAt: string;
+}
+
+// ---------- School library ----------
+export interface LibraryBookRow {
+  id: string; title: string; author: string; subject: string; description: string;
+  scope: string; originalName: string; storedFile: string; mime: string; size: number;
+  enabled: number; downloadCount: number; createdAt: string; updatedAt: string;
 }
 
 export function publicUser(u: UserRow & { className?: string | null }): {

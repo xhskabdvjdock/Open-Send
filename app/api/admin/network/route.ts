@@ -10,6 +10,7 @@ import {
   getHostnameUrl,
   getExpectedIpUrl,
 } from '@/lib/network';
+import { getSettings } from '@/lib/settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,6 +66,7 @@ export async function GET(req: Request) {
   const resolved = await resolveHostname(hostname);
   const mdnsOk = !!resolved.ok && (!!resolved.address && (resolved.address === expectedIp || detectedIps.includes(resolved.address)));
   const fw = firewallStatus(port);
+  const chatSettings = getSettings();
 
   // Keep legacy fields (localUrl/lanUrls/primaryUrl) so old clients keep working.
   return json({
@@ -84,6 +86,11 @@ export async function GET(req: Request) {
     mdnsResolvedIp: resolved.address || null,
     firewall: fw,
     server: 'Running',
+    chat: {
+      enabled: chatSettings.chatEnabled && chatSettings.chatStudentChat,
+      transport: 'SSE',
+      stream: '/api/chat/stream',
+    },
     warning: hasExpectedIp
       ? null
       : `Expected server IP ${expectedIp} not found on this machine. ${hostname} may not work correctly.`,

@@ -24,6 +24,24 @@ export interface AppSettings {
   retentionCompletedDays: number;
   autoDeleteExpired: boolean;
   adminCanPreview: boolean;
+  chatEnabled: boolean;
+  chatStudentChat: boolean;
+  chatTeacherChat: boolean;
+  chatMaxLength: number;
+  chatAttachments: boolean;
+  chatMaxAttachmentMB: number;
+  chatModeration: boolean;
+  chatDefaultSuspensionMinutes: number;
+  chatRateMax: number;
+  chatRateWindowMinutes: number;
+  chatShowOnline: boolean;
+  chatShowLastSeen: boolean;
+  chatBrowserNotify: boolean;
+  allowAvatarUpload: boolean;
+  allowUsernameChange: boolean;
+  maxAvatarMB: number;
+  libraryEnabled: boolean;
+  maxLibraryFileMB: number;
 }
 
 function toBool(v: string | undefined, dflt = false): boolean {
@@ -78,6 +96,24 @@ export function getSettings(): AppSettings {
     adminCanPreview: toBool(g('adminCanPreview'), false),
     allowTeacherDeleteFolders: toBool(g('allowTeacherDeleteFolders'), false),
     zipRetentionMinutes: Math.max(5, toNum(g('zipRetentionMinutes'), 60)),
+    chatEnabled: toBool(g('chatEnabled'), true),
+    chatStudentChat: toBool(g('chatStudentChat'), true),
+    chatTeacherChat: toBool(g('chatTeacherChat'), false),
+    chatMaxLength: Math.max(100, Math.min(10000, Math.floor(toNum(g('chatMaxLength'), 2000)))),
+    chatAttachments: toBool(g('chatAttachments'), true),
+    chatMaxAttachmentMB: Math.max(1, Math.min(2048, Math.floor(toNum(g('chatMaxAttachmentMB'), 25)))),
+    chatModeration: toBool(g('chatModeration'), true),
+    chatDefaultSuspensionMinutes: Math.max(1, Math.floor(toNum(g('chatDefaultSuspensionMinutes'), 10))),
+    chatRateMax: Math.max(1, Math.min(500, Math.floor(toNum(g('chatRateMax'), 20)))),
+    chatRateWindowMinutes: Math.max(1, Math.min(1440, Math.floor(toNum(g('chatRateWindowMinutes'), 1)))),
+    chatShowOnline: toBool(g('chatShowOnline'), true),
+    chatShowLastSeen: toBool(g('chatShowLastSeen'), true),
+    chatBrowserNotify: toBool(g('chatBrowserNotify'), false),
+    allowAvatarUpload: toBool(g('allowAvatarUpload'), true),
+    allowUsernameChange: toBool(g('allowUsernameChange'), true),
+    maxAvatarMB: Math.max(1, Math.min(100, Math.floor(toNum(g('maxAvatarMB'), 2)))),
+    libraryEnabled: toBool(g('libraryEnabled'), true),
+    maxLibraryFileMB: Math.max(1, Math.min(10240, Math.floor(toNum(g('maxLibraryFileMB'), 200)))),
   };
 }
 
@@ -94,6 +130,7 @@ export const PUBLIC_SETTINGS_KEYS = [
   'allowMultipleDownloads',
   'maxDownloads',
   'sendScope',
+  'libraryEnabled',
 ] as const;
 
 export function getPublicSettings(): Record<string, string | boolean | number> {
@@ -111,6 +148,7 @@ export function getPublicSettings(): Record<string, string | boolean | number> {
     allowMultipleDownloads: s.allowMultipleDownloads,
     maxDownloads: s.maxDownloads,
     sendScope: s.sendScope,
+    libraryEnabled: s.libraryEnabled,
   };
 }
 
@@ -136,6 +174,24 @@ const ALLOWED_KEYS = new Set([
   'adminCanPreview',
   'allowTeacherDeleteFolders',
   'zipRetentionMinutes',
+  'chatEnabled',
+  'chatStudentChat',
+  'chatTeacherChat',
+  'chatMaxLength',
+  'chatAttachments',
+  'chatMaxAttachmentMB',
+  'chatModeration',
+  'chatDefaultSuspensionMinutes',
+  'chatRateMax',
+  'chatRateWindowMinutes',
+  'chatShowOnline',
+  'chatShowLastSeen',
+  'chatBrowserNotify',
+  'allowAvatarUpload',
+  'allowUsernameChange',
+  'maxAvatarMB',
+  'libraryEnabled',
+  'maxLibraryFileMB',
 ]);
 
 export function isAllowedSettingKey(k: string): boolean {

@@ -17,7 +17,7 @@ export function storageRoot(): string {
   return process.env.OPENSEND_STORAGE || path.join(rootDir(), 'storage');
 }
 
-export function storageSubdir(kind: 'pending' | 'accepted' | 'completed' | 'rejected' | 'tmp' | 'submissions' | 'zips'): string {
+export function storageSubdir(kind: 'pending' | 'accepted' | 'completed' | 'rejected' | 'tmp' | 'submissions' | 'zips' | 'chat' | 'avatars' | 'library'): string {
   return path.join(storageRoot(), kind);
 }
 
@@ -29,11 +29,11 @@ export function ensureDirs(): void {
   for (const d of [dataDir(), storageRoot(), backupsDir()]) {
     fs.mkdirSync(d, { recursive: true });
   }
-  for (const k of ['pending', 'accepted', 'completed', 'rejected', 'tmp', 'submissions', 'zips'] as const) {
+  for (const k of ['pending', 'accepted', 'completed', 'rejected', 'tmp', 'submissions', 'zips', 'chat', 'avatars', 'library'] as const) {
     fs.mkdirSync(storageSubdir(k), { recursive: true });
   }
   // Prevent static serving / execution surprises: deny directory listing hint files
-  for (const k of ['pending', 'accepted', 'completed', 'rejected', 'tmp', 'submissions', 'zips'] as const) {
+  for (const k of ['pending', 'accepted', 'completed', 'rejected', 'tmp', 'submissions', 'zips', 'chat', 'avatars', 'library'] as const) {
     const deny = path.join(storageSubdir(k), '.deny');
     if (!fs.existsSync(deny)) {
       try {
@@ -62,6 +62,13 @@ export function findStoredFile(storedFile: string): string | null {
 export function findSubmissionFile(storedFile: string): string | null {
   if (!isSafeInternalId(storedFile)) return null;
   const p = path.join(storageSubdir('submissions'), storedFile);
+  return fs.existsSync(p) ? p : null;
+}
+
+/** Chat attachment lookup (isolated bucket — never mixed with transfers). */
+export function findChatFile(storedFile: string): string | null {
+  if (!isSafeInternalId(storedFile)) return null;
+  const p = path.join(storageSubdir('chat'), storedFile);
   return fs.existsSync(p) ? p : null;
 }
 

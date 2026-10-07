@@ -24,6 +24,32 @@ param(
 
 $ErrorActionPreference = 'Continue'
 
+# Load .env next to the project (same values the server and mDNS use).
+# Explicit environment / script parameters always win over the file.
+$DotEnvPath = Join-Path (Split-Path -Parent $PSScriptRoot) '.env'
+if (Test-Path -LiteralPath $DotEnvPath) {
+  foreach ($line in (Get-Content -LiteralPath $DotEnvPath)) {
+    $t = $line.Trim()
+    if (-not $t -or $t.StartsWith('#')) { continue }
+    if ($t -match '^(?i)export\s+') { $t = $t.Substring($Matches[0].Length).Trim() }
+    $eq = $t.IndexOf('=')
+    if ($eq -lt 0) { continue }
+    $k = $t.Substring(0, $eq).Trim()
+    $v = $t.Substring($eq + 1).Trim()
+    if ($v.Length -ge 2 -and (($v.StartsWith('"') -and $v.EndsWith('"')) -or ($v.StartsWith("'") -and $v.EndsWith("'")))) {
+      $v = $v.Substring(1, $v.Length - 2)
+    }
+    if ([string]::IsNullOrEmpty($k)) { continue }
+    if (($k -eq 'OPEN_SEND_HOST' -or $k -eq 'OPENSEND_HOST_IP') -and -not $env:OPEN_SEND_HOST -and -not $env:OPENSEND_HOST_IP) {
+      $env:OPEN_SEND_HOST = $v
+    }
+    if (($k -eq 'OPEN_SEND_HOSTNAME' -or $k -eq 'OPENSEND_HOSTNAME') -and -not $env:OPEN_SEND_HOSTNAME -and -not $env:OPENSEND_HOSTNAME) {
+      $env:OPEN_SEND_HOSTNAME = $v
+    }
+  }
+  Write-Host "Loaded .env overrides."
+}
+
 if (-not $ExpectedIp -or $ExpectedIp.Trim() -eq '') {
   if ($env:OPEN_SEND_HOST) { $ExpectedIp = $env:OPEN_SEND_HOST }
   elseif ($env:OPENSEND_HOST_IP) { $ExpectedIp = $env:OPENSEND_HOST_IP }

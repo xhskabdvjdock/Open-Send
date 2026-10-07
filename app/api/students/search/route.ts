@@ -26,7 +26,8 @@ export async function GET(req: Request) {
     const like = `%${q.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
     params.push(like, like);
   }
-  const sql = `SELECT u.id, u.username, u.displayName, u.classId, c.name AS className
+  const sql = `SELECT u.id, u.username, u.displayName, u.classId, c.name AS className,
+    CASE WHEN COALESCE(u.avatarFile, '') = '' THEN 0 ELSE 1 END AS hasAvatar
     FROM users u LEFT JOIN classes c ON c.id = u.classId
     WHERE ${where.join(' AND ')}
     ORDER BY u.displayName COLLATE NOCASE LIMIT 30`;

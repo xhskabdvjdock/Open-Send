@@ -34,6 +34,14 @@ export function extOf(filename: string): string {
   return filename.slice(i + 1).toLowerCase().slice(0, 16);
 }
 
+/** Profile pictures: small images only (mime AND extension must both match). */
+const AVATAR_MIMES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const AVATAR_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp']);
+
+export function isAvatarFile(mime: string, ext: string): boolean {
+  return AVATAR_MIMES.has((mime || '').toLowerCase()) && AVATAR_EXTS.has((ext || '').toLowerCase());
+}
+
 export function parseCsvList(v: string | null | undefined): string[] {
   if (!v) return [];
   return v

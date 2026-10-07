@@ -24,6 +24,7 @@ type NetInfo = {
   firewall: { app: string; mdns: string };
   server: string;
   warning: string | null;
+  chat?: { enabled: boolean; transport: string; stream: string };
 };
 
 async function api(path: string) {
@@ -139,6 +140,11 @@ export default function NetworkDiagnosticsPage() {
               value={`${net.firewall?.app || 'Unknown'} (TCP ${net.port}, Private)`}
             />
             <Row label={t('netLocalAccess')} ok={health === 'Running'} value={net.hostnameUrl} />
+            <Row
+              label={`${t('tabChat')} (SSE)`}
+              ok={net.chat?.enabled === true}
+              value={net.chat?.enabled ? `OK (${net.chat.transport}, ${net.chat.stream})` : 'Disabled'}
+            />
 
             <dl className="kv mt">
               <dt>{t('netExpectedIp')}</dt><dd dir="ltr">{net.expectedIp}</dd>

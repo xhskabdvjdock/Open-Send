@@ -28,7 +28,7 @@ export async function PUT(req: Request) {
   for (const [k, v] of Object.entries(settings)) {
     if (!isAllowedSettingKey(k)) continue;
     // Basic sanity validation for numeric fields
-    if (['maxFileSizeMB', 'maxFilesPerTransfer', 'defaultExpiryHours', 'maxDownloads', 'retentionDeclinedDays', 'retentionCancelledDays', 'retentionExpiredDays', 'retentionCompletedDays'].includes(k)) {
+    if (['maxFileSizeMB', 'maxFilesPerTransfer', 'defaultExpiryHours', 'maxDownloads', 'retentionDeclinedDays', 'retentionCancelledDays', 'retentionExpiredDays', 'retentionCompletedDays', 'chatMaxLength', 'chatMaxAttachmentMB', 'chatDefaultSuspensionMinutes', 'chatRateMax', 'chatRateWindowMinutes', 'maxAvatarMB'].includes(k)) {
       const n = Number(v);
       if (!Number.isFinite(n) || n < 0 || n > 100000) return err(`Invalid value for ${k}.`, 400);
     }

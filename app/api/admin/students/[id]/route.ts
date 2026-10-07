@@ -72,6 +72,41 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       } catch {}
     }
   } catch {}
+  // Delete physical files of their chat attachments (no FK cascade there)
+  try {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { storageSubdir } = await import('@/lib/paths');
+    const cfiles = db.prepare("SELECT attachmentFile FROM chat_messages WHERE senderId = ? AND attachmentFile != ''").all(params.id) as unknown as { attachmentFile: string }[];
+    for (const fl of cfiles) {
+      try {
+        const p = path.join(storageSubdir('chat'), fl.attachmentFile);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch {}
+    }
+  } catch {}
+  // Delete their profile picture bytes too (no FK cascade on the column).
+  try {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { storageSubdir } = await import('@/lib/paths');
+    const av = db.prepare('SELECT avatarFile FROM users WHERE id = ?').get(params.id) as unknown as { avatarFile: string } | undefined;
+    if (av?.avatarFile) {
+      try {
+        const p = path.join(storageSubdir('avatars'), av.avatarFile);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch {}
+    }
+  } catch {}
+  // Chat rows reference students without FKs (teachers share the tables):
+  // remove participations, own messages, presence and blocks, then conversations left empty.
+  try {
+    db.prepare('DELETE FROM conversation_participants WHERE userId = ?').run(params.id);
+    db.prepare('DELETE FROM chat_messages WHERE senderId = ?').run(params.id);
+    db.prepare('DELETE FROM chat_presence WHERE userId = ?').run(params.id);
+    db.prepare('DELETE FROM chat_blocks WHERE blockerId = ? OR blockedId = ?').run(params.id, params.id);
+    db.prepare('DELETE FROM conversations WHERE id NOT IN (SELECT conversationId FROM conversation_participants)').run();
+  } catch {}
   db.prepare('DELETE FROM users WHERE id = ?').run(params.id);
   audit('Admin Deleted Student', { actorType: 'admin', actorId: g.admin.id, actorName: g.admin.username, details: `username=${user.username}`, ip: clientIp(req) });
   return json({ ok: true });

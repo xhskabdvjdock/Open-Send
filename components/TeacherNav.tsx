@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, FolderOpen, Users, ScrollText, User, LogOut, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Users, ScrollText, User, LogOut, GraduationCap, MessageCircle } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 
 export function TeacherNav({ name }: { name?: string }) {
@@ -13,6 +13,7 @@ export function TeacherNav({ name }: { name?: string }) {
     { href: '/teacher', label: t('teacherDash'), icon: <LayoutDashboard size={16} /> },
     { href: '/teacher/folders', label: t('myFolders'), icon: <FolderOpen size={16} /> },
     { href: '/teacher/students', label: t('students'), icon: <Users size={16} /> },
+    { href: '/teacher/chat', label: t('chat'), icon: <MessageCircle size={16} /> },
     { href: '/teacher/activity', label: t('activity'), icon: <ScrollText size={16} /> },
     { href: '/teacher/profile', label: t('profile'), icon: <User size={16} /> },
   ];

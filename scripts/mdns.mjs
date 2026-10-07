@@ -12,6 +12,7 @@
 // detected LAN IP is advertised and a warning is printed (server keeps working via IP).
 
 import os from 'node:os';
+import './load-env.mjs';
 import createMdns from 'multicast-dns';
 
 const EXPECTED_IP = (process.env.OPEN_SEND_HOST || process.env.OPENSEND_HOST_IP || '192.168.1.118').trim() || '192.168.1.118';

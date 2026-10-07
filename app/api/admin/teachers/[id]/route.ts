@@ -78,6 +78,22 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       } catch {}
     }
   } catch {}
+  // Chat: students keep their history (sender shows as unknown), but drop the
+  // teacher's presence and any blocks involving them.
+  try {
+    db.prepare('DELETE FROM chat_presence WHERE userId = ?').run(params.id);
+    db.prepare('DELETE FROM chat_blocks WHERE blockerId = ? OR blockedId = ?').run(params.id, params.id);
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { storageSubdir } = await import('@/lib/paths');
+    const av = db.prepare('SELECT avatarFile FROM teachers WHERE id = ?').get(params.id) as unknown as { avatarFile: string } | undefined;
+    if (av?.avatarFile) {
+      try {
+        const p = path.join(storageSubdir('avatars'), av.avatarFile);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch {}
+    }
+  } catch {}
   db.prepare('DELETE FROM teachers WHERE id = ?').run(params.id);
   audit('Admin Deleted Teacher', { actorType: 'admin', actorId: g.admin.id, actorName: g.admin.username, details: `teacher=${t.username}`, ip: clientIp(req) });
   return json({ ok: true });

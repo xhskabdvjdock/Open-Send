@@ -10,6 +10,7 @@
 //   OPEN_SEND_HOST / OPENSEND_HOST_IP, OPEN_SEND_HOSTNAME / OPENSEND_HOSTNAME, PORT
 
 import os from 'node:os';
+import './load-env.mjs';
 import dns from 'node:dns';
 import { execSync } from 'node:child_process';
 

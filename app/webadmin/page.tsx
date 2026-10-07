@@ -8,13 +8,13 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Users, Shapes, ArrowLeftRight, HardDrive, Settings as SettingsIcon,
   ScrollText, Server, LogOut, ShieldAlert, Plus, Pencil, Trash2, KeyRound, Upload, RefreshCw,
-  GraduationCap, FolderOpen, Download, Eye,
+  GraduationCap, FolderOpen, Download, Eye, MessageCircle, BookOpen,
 } from 'lucide-react';
 import { formatBytes } from '@/lib/validation';
 import { useT, type TKey, translateError } from '@/lib/i18n';
 import { useConfirm, usePrompt } from '@/components/dialogs';
 
-type Tab = 'overview' | 'students' | 'teachers' | 'folders' | 'classes' | 'transfers' | 'storage' | 'settings' | 'logs' | 'system';
+type Tab = 'overview' | 'students' | 'teachers' | 'folders' | 'classes' | 'transfers' | 'chat' | 'library' | 'storage' | 'settings' | 'logs' | 'system';
 
 const TABS: { id: Tab; labelKey: TKey; icon: React.ReactNode }[] = [
   { id: 'overview', labelKey: 'tabOverview', icon: <LayoutDashboard size={15} /> },
@@ -23,6 +23,8 @@ const TABS: { id: Tab; labelKey: TKey; icon: React.ReactNode }[] = [
   { id: 'folders', labelKey: 'tabFolders', icon: <FolderOpen size={15} /> },
   { id: 'classes', labelKey: 'tabClasses', icon: <Shapes size={15} /> },
   { id: 'transfers', labelKey: 'tabTransfers', icon: <ArrowLeftRight size={15} /> },
+  { id: 'chat', labelKey: 'tabChat', icon: <MessageCircle size={15} /> },
+  { id: 'library', labelKey: 'tabLibrary', icon: <BookOpen size={15} /> },
   { id: 'storage', labelKey: 'tabStorage', icon: <HardDrive size={15} /> },
   { id: 'settings', labelKey: 'tabSettings', icon: <SettingsIcon size={15} /> },
   { id: 'logs', labelKey: 'tabLogs', icon: <ScrollText size={15} /> },
@@ -127,6 +129,8 @@ export default function WebAdminPage() {
       {tab === 'folders' && <Folders />}
       {tab === 'classes' && <Classes />}
       {tab === 'transfers' && <Transfers />}
+      {tab === 'chat' && <ChatAdmin />}
+      {tab === 'library' && <LibraryAdmin />}
       {tab === 'storage' && <Storage />}
       {tab === 'settings' && <SettingsPanel />}
       {tab === 'logs' && <Logs />}
@@ -973,6 +977,9 @@ function SettingsPanel() {
         <label className="lbl">{t('seRegistration')}</label>{bool('registrationEnabled')}
         <label className="lbl">{t('seMaintenance')}</label>{bool('maintenanceMode')}
         <label className="lbl">{t('seAllowClass')}</label>{bool('allowClassChange')}
+        <label className="lbl">{t('seAllowAvatar')}</label>{bool('allowAvatarUpload')}
+        <label className="lbl">{t('seMaxAvatar')}</label>{num('maxAvatarMB')}
+        <label className="lbl">{t('seAllowUsername')}</label>{bool('allowUsernameChange')}
         <label className="lbl">{t('seMaxSize')}</label>{num('maxFileSizeMB')}
         <label className="lbl">{t('seMaxFiles')}</label>{num('maxFilesPerTransfer')}
         <label className="lbl">{t('seAllowExt')}</label>{txt('allowedExtensions')}
@@ -980,6 +987,8 @@ function SettingsPanel() {
         <label className="lbl">{t('seExpiry')}</label>{num('defaultExpiryHours')}
         <label className="lbl">{t('seMultiDl')}</label>{bool('allowMultipleDownloads')}
         <label className="lbl">{t('seMaxDl')}</label>{num('maxDownloads')}
+        <label className="lbl">{t('seLibrary')}</label>{bool('libraryEnabled')}
+        <label className="lbl">{t('seMaxLibrary')}</label>{num('maxLibraryFileMB')}
       </div>
       <div className="card">
         <h3>{t('seClassRestr')}</h3>
@@ -1303,6 +1312,707 @@ function NetworkPanel({ net, qrUrl, setQrUrl }: {
           <li>{t('netHow2')}</li>
           <li>{t('netHow3')} <b dir="ltr">{hostnameUrl}</b></li>
         </ol>
+      </div>
+    </div>
+  );
+}
+
+/* ---- School library administration: books CRUD with class targeting ---- */
+
+function LibraryAdmin() {
+  const { t } = useT();
+  const { dialog: confirmDialog, ask: askConfirm } = useConfirm();
+  const [items, setItems] = useState<Record<string, string | number>[]>(
+    []
+  );
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+  const [msg, setMsg] = useState('');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    title: '',
+    author: '',
+    subject: '',
+    description: '',
+    scope: 'all',
+    classIds: [] as string[],
+    enabled: true,
+  });
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    try {
+      const j = await api('/api/admin/library/books');
+      setItems(j.books);
+      setClasses(j.classes || []);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  function resetForm() {
+    setEditing(null);
+    setForm({ title: '', author: '', subject: '', description: '', scope: 'all', classIds: [], enabled: true });
+    setFile(null);
+  }
+
+  function toggleClass(id: string) {
+    setForm((f) => ({ ...f, classIds: f.classIds.includes(id) ? f.classIds.filter((x) => x !== id) : [...f.classIds, id] }));
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title.trim()) {
+      setMsg(t('errRequiredField'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('title', form.title.trim());
+      fd.append('author', form.author.trim());
+      fd.append('subject', form.subject.trim());
+      fd.append('description', form.description.trim());
+      fd.append('scope', form.scope);
+      fd.append('enabled', form.enabled ? 'true' : 'false');
+      for (const cid of form.classIds) fd.append('classIds', cid);
+      if (file) fd.append('file', file, file.name);
+      const url = editing ? `/api/admin/library/books/${editing}` : '/api/admin/library/books';
+      const r = await fetch(url, { method: editing ? 'PATCH' : 'POST', body: fd });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(translateError(j.error || `Request failed (${r.status})`));
+      resetForm();
+      setMsg(t('saved'));
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: string, title: string) {
+    const ok = await askConfirm({ title, message: t('lbConfirmDel'), okLabel: t('del'), danger: true });
+    if (!ok) return;
+    try {
+      await api(`/api/admin/library/books/${id}`, { method: 'DELETE' });
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  function startEdit(b: Record<string, string | number>) {
+    setEditing(String(b.id));
+    setFile(null);
+    setForm({
+      title: String(b.title),
+      author: String(b.author || ''),
+      subject: String(b.subject || ''),
+      description: String(b.description || ''),
+      scope: String(b.scope || 'all'),
+      classIds: ((b.classes as unknown as { id: string }[]) || []).map((c) => c.id),
+      enabled: !!b.enabled,
+    });
+  }
+
+  return (
+    <div className="grid">
+      {confirmDialog}
+      {msg && <div className="card"><span className="small">{msg}</span></div>}
+      <div className="card">
+        <h3>{editing ? t('lbEdit') : t('lbNewBook')}</h3>
+        <form onSubmit={save}>
+          <label className="lbl">{t('lbTitle')}</label>
+          <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required maxLength={120} dir="auto" />
+          <div className="grid grid-2">
+            <div>
+              <label className="lbl">{t('lbAuthor')}</label>
+              <input className="input" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} maxLength={120} dir="auto" />
+            </div>
+            <div>
+              <label className="lbl">{t('lbSubject')}</label>
+              <input className="input" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} maxLength={80} dir="auto" />
+            </div>
+          </div>
+          <label className="lbl">{t('lgDetails')}</label>
+          <textarea className="textarea" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={2000} dir="auto" />
+          <label className="lbl">{t('lbScope')}</label>
+          <select className="select" value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value })}>
+            <option value="all">{t('lbScopeAll')}</option>
+            <option value="classes">{t('lbScopeClasses')}</option>
+          </select>
+          {form.scope === 'classes' && (
+            <>
+              <label className="lbl">{t('lbPickClasses')}</label>
+              <div className="row">
+                {classes.map((c) => (
+                  <label key={c.id} className="small">
+                    <input type="checkbox" checked={form.classIds.includes(c.id)} onChange={() => toggleClass(c.id)} /> {c.name}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+          <label className="lbl">{editing ? t('lbReplaceFile') : t('lbFile')}</label>
+          <input className="input" type="file" accept=".pdf,.epub,.doc,.docx,.ppt,.pptx,.txt" onChange={(e) => setFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} required={!editing} />
+          <label className="lbl">{t('syStatus')}</label>
+          <select className="select" value={form.enabled ? '1' : '0'} onChange={(e) => setForm({ ...form, enabled: e.target.value === '1' })}>
+            <option value="1">{t('clEnabled')}</option>
+            <option value="0">{t('clDisabled')}</option>
+          </select>
+          <div className="row mt">
+            <button className="btn btn-primary" disabled={busy}>{t('save')}</button>
+            {editing && <button type="button" className="btn" onClick={resetForm}>{t('stCancel')}</button>}
+          </div>
+        </form>
+      </div>
+      <div className="card">
+        <div className="table-wrap">
+          <table className="tbl">
+            <thead><tr><th>{t('lbTitle')}</th><th>{t('lbSubject')}</th><th>{t('lbScope')}</th><th>{t('lbDownloads')}</th><th>{t('syStatus')}</th><th>{t('stActions')}</th></tr></thead>
+            <tbody>
+              {items.map((b) => (
+                <tr key={String(b.id)}>
+                  <td><b dir="auto">{String(b.title)}</b><div className="small muted" dir="auto">{String(b.author || '')}</div></td>
+                  <td className="small">{String(b.subject || '—')}</td>
+                  <td className="small">{String(b.scope) === 'classes' ? `${t('lbScopeClasses')} (${((b.classes as unknown as unknown[]) || []).length})` : t('lbScopeAll')}</td>
+                  <td className="small">{String(b.downloadCount ?? 0)}</td>
+                  <td><span className={`status ${b.enabled ? 'status-downloaded' : 'status-expired'}`}>{b.enabled ? t('clEnabled') : t('clDisabled')}</span></td>
+                  <td>
+                    <div className="row">
+                      <button className="btn btn-sm" onClick={() => startEdit(b)}><Pencil size={13} /></button>
+                      <button className="btn btn-sm" onClick={() => remove(String(b.id), String(b.title))}><Trash2 size={13} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- Student chat administration: overview / banned words / suspensions / logs / settings ---- */
+
+const CHAT_DURATIONS = [1, 5, 10, 30, 60, 360, 1440, 4320, 10080];
+
+function fmtChatDur(min: number, lang: 'ar' | 'en', t: (k: TKey) => string): string {
+  const m = Math.max(1, Math.floor(Number(min) || 0));
+  const unit = (n: number, one: string, two: string, few: string, many: string) => {
+    if (lang !== 'ar') return n === 1 ? `1 ${one}` : `${n} ${one}s`;
+    if (n === 1) return `${one} واحدة`;
+    if (n === 2) return two;
+    if (n <= 10) return `${n} ${few}`;
+    return `${n} ${many}`;
+  };
+  if (m % 1440 === 0) {
+    const d = m / 1440;
+    return unit(d, lang === 'ar' ? 'يوم' : t('chDay'), 'يومان', 'أيام', 'يوم');
+  }
+  if (m % 60 === 0) {
+    const h = m / 60;
+    return unit(h, lang === 'ar' ? 'ساعة' : t('chHour'), 'ساعتان', 'ساعات', 'ساعة');
+  }
+  return unit(m, lang === 'ar' ? 'دقيقة' : t('chMin'), 'دقيقتان', 'دقائق', 'دقيقة');
+}
+
+function ChatAdmin() {
+  const { t } = useT();
+  const [sub, setSub] = useState<'overview' | 'words' | 'suspensions' | 'logs' | 'settings'>('overview');
+  return (
+    <div className="grid">
+      <div className="admin-tabs" role="tablist">
+        {(['overview', 'words', 'suspensions', 'logs', 'settings'] as const).map((s) => (
+          <button
+            key={s}
+            role="tab"
+            className={sub === s ? 'active' : ''}
+            onClick={() => setSub(s)}
+          >
+            {t((({ overview: 'chOverview', words: 'chWords', suspensions: 'chSuspensions', logs: 'chLogs', settings: 'chSettings' }) as Record<string, TKey>)[s])}
+          </button>
+        ))}
+      </div>
+      {sub === 'overview' && <ChatOverview />}
+      {sub === 'words' && <ChatWords />}
+      {sub === 'suspensions' && <ChatSuspensions />}
+      {sub === 'logs' && <ChatLogs />}
+      {sub === 'settings' && <ChatSettings />}
+    </div>
+  );
+}
+
+function ChatOverview() {
+  const { t } = useT();
+  const [stats, setStats] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    api('/api/admin/chat/stats').then((j) => setStats(j.stats)).catch(() => {});
+  }, []);
+  if (!stats) return <div className="card">{t('loading')}</div>;
+  const cards: [TKey, number][] = [
+    ['chUsers', stats.chatUsers],
+    ['chActiveConv', stats.activeConversations],
+    ['chMsgsToday', stats.messagesToday],
+    ['chMsgsWeek', stats.messagesWeek],
+    ['chViolToday', stats.violationsToday],
+    ['chActive', stats.activeSuspensions],
+  ];
+  return (
+    <div className="grid grid-3">
+      {cards.map(([k, v]) => (
+        <div key={k} className="card stat">
+          <div><b>{v}</b><span>{t(k)}</span></div>
+        </div>
+      ))}
+      <div className="card">
+        <b>{t('chWords')}</b>
+        <div className="muted">{stats.bannedWords} ({stats.bannedWordsActive} {t('chActive')})</div>
+      </div>
+      <div className="card">
+        <b>{t('chStreams')}</b>
+        <div className="muted">{stats.openStreams}</div>
+      </div>
+    </div>
+  );
+}
+
+function ChatWords() {
+  const { t, lang } = useT();
+  const { dialog: confirmDialog, ask: askConfirm } = useConfirm();
+  const [items, setItems] = useState<{ id: string; word: string; matchType: string; suspensionMinutes: number; enabled: number; violations: number }[]>([]);
+  const [msg, setMsg] = useState('');
+  const [form, setForm] = useState({ word: '', matchType: 'whole', minutes: '10', customMinutes: '', enabled: true });
+  const [editing, setEditing] = useState<string | null>(null);
+
+  async function load() {
+    try {
+      const j = await api('/api/admin/chat/words');
+      setItems(j.words);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  function minutesOf(): number {
+    if (form.minutes === 'custom') return Math.floor(Number(form.customMinutes) || 0);
+    return Math.floor(Number(form.minutes) || 0);
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    const minutes = minutesOf();
+    try {
+      if (editing) {
+        await api(`/api/admin/chat/words/${editing}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word: form.word, matchType: form.matchType, suspensionMinutes: minutes, enabled: form.enabled }),
+        });
+      } else {
+        await api('/api/admin/chat/words', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word: form.word, matchType: form.matchType, suspensionMinutes: minutes, enabled: form.enabled }),
+        });
+      }
+      setEditing(null);
+      setForm({ word: '', matchType: 'whole', minutes: '10', customMinutes: '', enabled: true });
+      setMsg(t('saved'));
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function toggle(w: { id: string; enabled: number }) {
+    try {
+      await api(`/api/admin/chat/words/${w.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !w.enabled }),
+      });
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function remove(id: string, word: string) {
+    const ok = await askConfirm({ title: word, message: t('chConfirmDelWord'), okLabel: t('del'), danger: true });
+    if (!ok) return;
+    try {
+      await api(`/api/admin/chat/words/${id}`, { method: 'DELETE' });
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  function startEdit(w: { id: string; word: string; matchType: string; suspensionMinutes: number; enabled: number }) {
+    setEditing(w.id);
+    const preset = CHAT_DURATIONS.includes(w.suspensionMinutes) ? String(w.suspensionMinutes) : 'custom';
+    setForm({
+      word: w.word,
+      matchType: w.matchType,
+      minutes: preset,
+      customMinutes: preset === 'custom' ? String(w.suspensionMinutes) : '',
+      enabled: !!w.enabled,
+    });
+  }
+
+  const matchLabel = (mt: string) => (mt === 'contains' ? t('chContains') : mt === 'phrase' ? t('chPhrase') : t('chWhole'));
+
+  return (
+    <div className="grid">
+      {confirmDialog}
+      {msg && <div className="card"><span className="small">{msg}</span></div>}
+      <div className="card">
+        <h3>{editing ? t('chEdit') : t('chAdd')}</h3>
+        <form onSubmit={save}>
+          <label className="lbl">{t('chWord')}</label>
+          <input className="input" value={form.word} onChange={(e) => setForm({ ...form, word: e.target.value })} required maxLength={60} dir="auto" />
+          <label className="lbl">{t('chMatchType')}</label>
+          <select className="select" value={form.matchType} onChange={(e) => setForm({ ...form, matchType: e.target.value })}>
+            <option value="whole">{t('chWhole')}</option>
+            <option value="contains">{t('chContains')}</option>
+            <option value="phrase">{t('chPhrase')}</option>
+          </select>
+          <label className="lbl">{t('chDuration')}</label>
+          <div className="row">
+            <select className="select" style={{ maxWidth: 220 }} value={form.minutes} onChange={(e) => setForm({ ...form, minutes: e.target.value })}>
+              {CHAT_DURATIONS.map((d) => (
+                <option key={d} value={String(d)}>{fmtChatDur(d, lang, t)}</option>
+              ))}
+              <option value="custom">{t('chCustom')}</option>
+            </select>
+            {form.minutes === 'custom' && (
+              <input className="input" style={{ maxWidth: 160 }} type="number" min={1} max={43200} placeholder="30" value={form.customMinutes} onChange={(e) => setForm({ ...form, customMinutes: e.target.value })} required />
+            )}
+          </div>
+          <label className="lbl">{t('chStatus')}</label>
+          <select className="select" value={form.enabled ? '1' : '0'} onChange={(e) => setForm({ ...form, enabled: e.target.value === '1' })}>
+            <option value="1">{t('chActive')}</option>
+            <option value="0">{t('chDisable')}</option>
+          </select>
+          <div className="row mt">
+            <button className="btn btn-primary">{t('save')}</button>
+            {editing && <button type="button" className="btn" onClick={() => { setEditing(null); setForm({ word: '', matchType: 'whole', minutes: '10', customMinutes: '', enabled: true }); }}>{t('stCancel')}</button>}
+          </div>
+        </form>
+      </div>
+      <div className="card">
+        <div className="table-wrap">
+          <table className="tbl">
+            <thead><tr><th>{t('chWord')}</th><th>{t('chMatchType')}</th><th>{t('chDuration')}</th><th>{t('chStatus')}</th><th>{t('chViolations')}</th><th>{t('stActions')}</th></tr></thead>
+            <tbody>
+              {items.map((w) => (
+                <tr key={w.id}>
+                  <td dir="auto"><b>{w.word}</b></td>
+                  <td className="small">{matchLabel(w.matchType)}</td>
+                  <td className="small" dir="ltr">{fmtChatDur(w.suspensionMinutes, lang, t)}</td>
+                  <td><span className={`status ${w.enabled ? 'status-downloaded' : 'status-expired'}`}>{w.enabled ? t('chActive') : t('chDisable')}</span></td>
+                  <td className="small">{w.violations}</td>
+                  <td>
+                    <div className="row">
+                      <button className="btn btn-sm" onClick={() => startEdit(w)}><Pencil size={13} /></button>
+                      <button className="btn btn-sm" onClick={() => toggle(w)}>{w.enabled ? t('chDisable') : t('chEnable')}</button>
+                      <button className="btn btn-sm" onClick={() => remove(w.id, w.word)}><Trash2 size={13} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatSuspensions() {
+  const { t } = useT();
+  const [items, setItems] = useState<{ id: string; userId: string; username: string; displayName: string; startsAt: string; endsAt: string; reason: string }[]>([]);
+  const [msg, setMsg] = useState('');
+  const [q, setQ] = useState('');
+  const [found, setFound] = useState<{ id: string; username: string; displayName: string }[]>([]);
+  const [detail, setDetail] = useState<{ student: Record<string, unknown>; active: Record<string, unknown> | null; history: Record<string, unknown>[] } | null>(null);
+  const [manual, setManual] = useState({ minutes: '10', reason: '' });
+  const [extendMin, setExtendMin] = useState('30');
+
+  async function load() {
+    try {
+      const j = await api('/api/admin/chat/suspensions?active=1');
+      setItems(j.suspensions);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function search() {
+    try {
+      const j = await api(`/api/admin/students?q=${encodeURIComponent(q)}`);
+      setFound(j.students || []);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function openStudent(id: string) {
+    try {
+      const j = await api(`/api/admin/chat/suspensions?userId=${encodeURIComponent(id)}`);
+      setDetail(j);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function act(id: string, action: string, extra?: Record<string, unknown>) {
+    try {
+      await api(`/api/admin/chat/suspensions/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...(extra || {}) }),
+      });
+      setMsg(t('saved'));
+      load();
+      if (detail) openStudent(String((detail.student as Record<string, unknown>).id));
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function suspend() {
+    if (!detail) return;
+    try {
+      await api('/api/admin/chat/suspensions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: String((detail.student as Record<string, unknown>).id), minutes: Number(manual.minutes) || 10, reason: manual.reason || 'manual-suspend' }),
+      });
+      setMsg(t('saved'));
+      setManual({ minutes: '10', reason: '' });
+      load();
+      openStudent(String((detail.student as Record<string, unknown>).id));
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  const left = (endsAt: string) => {
+    const ms = Math.max(0, new Date(endsAt).getTime() - Date.now());
+    const m = Math.ceil(ms / 60000);
+    return m > 0 ? `${m} ${t('chMin')}` : '—';
+  };
+
+  return (
+    <div className="grid">
+      {msg && <div className="card"><span className="small">{msg}</span></div>}
+      <div className="card">
+        <h3>{t('chActiveSusp')} ({items.length})</h3>
+        {items.length === 0 ? <p className="muted small">{t('chNoSusp')}</p> : (
+          <div className="table-wrap">
+            <table className="tbl">
+              <thead><tr><th>{t('chStudent')}</th><th>{t('chReason')}</th><th>{t('chStarts')}</th><th>{t('chEnds')}</th><th>{t('chRemaining')}</th><th>{t('stActions')}</th></tr></thead>
+              <tbody>
+                {items.map((s) => (
+                  <tr key={s.id}>
+                    <td className="small">{String(s.displayName)} (@{String(s.username)})</td>
+                    <td className="small" dir="auto">{s.reason}</td>
+                    <td className="small">{String(s.startsAt).slice(0, 16).replace('T', ' ')}</td>
+                    <td className="small">{String(s.endsAt).slice(0, 16).replace('T', ' ')}</td>
+                    <td className="small">{left(String(s.endsAt))}</td>
+                    <td>
+                      <div className="row">
+                        <button className="btn btn-sm" onClick={() => act(s.id, 'unsuspend')}>{t('chUnsuspend')}</button>
+                        <input className="input" style={{ maxWidth: 90 }} type="number" min={1} value={extendMin} onChange={(e) => setExtendMin(e.target.value)} dir="ltr" />
+                        <button className="btn btn-sm" onClick={() => act(s.id, 'extend', { extraMinutes: Number(extendMin) || 30 })}>{t('chExtend')}</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      <div className="card">
+        <h3>{t('chStudent')}</h3>
+        <div className="row">
+          <input className="input" style={{ maxWidth: 260 }} placeholder={t('chLookupPh')} value={q} onChange={(e) => setQ(e.target.value)} />
+          <button className="btn btn-sm btn-primary" onClick={search}>{t('stSearch')}</button>
+        </div>
+        <div className="row mt">
+          {found.map((u) => (
+            <button key={u.id} className="btn btn-sm" onClick={() => openStudent(u.id)}>@{u.username}</button>
+          ))}
+        </div>
+        {detail && (
+          <div className="mt">
+            <b>@{String((detail.student as Record<string, unknown>).username)} — {String((detail.student as Record<string, unknown>).displayName)}</b>
+            {detail.active ? (
+              <p className="small">{t('chActiveSusp')}: {String((detail.active as Record<string, unknown>).endsAt).slice(0, 16).replace('T', ' ')} ({t('chReason')}: {String((detail.active as Record<string, unknown>).reason)})</p>
+            ) : (
+              <p className="small muted">{t('chNoSusp')}</p>
+            )}
+            <div className="row">
+              <input className="input" style={{ maxWidth: 140 }} type="number" min={1} max={43200} value={manual.minutes} onChange={(e) => setManual({ ...manual, minutes: e.target.value })} dir="ltr" />
+              <input className="input" style={{ maxWidth: 260 }} placeholder={t('chSuspendReasonPh')} value={manual.reason} onChange={(e) => setManual({ ...manual, reason: e.target.value })} dir="auto" />
+              <button className="btn btn-sm btn-primary" onClick={suspend}>{t('chManualSusp')}</button>
+            </div>
+            <h4 className="mt">{t('chHistory')}</h4>
+            {detail.history.map((h) => (
+              <div key={String(h.id)} className="small">
+                {String(h.startsAt).slice(0, 16).replace('T', ' ')} → {String(h.endsAt).slice(0, 16).replace('T', ' ')} · {String(h.reason)} · {Number(h.active) ? t('chActive') : '—'}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChatLogs() {
+  const { t } = useT();
+  const [items, setItems] = useState<Record<string, string | number>[]>([]);
+  const [actions, setActions] = useState<string[]>([]);
+  const [f, setF] = useState({ student: '', date: '', word: '', action: '' });
+  const [msg, setMsg] = useState('');
+
+  async function load() {
+    try {
+      const p = new URLSearchParams(f as Record<string, string>).toString();
+      const j = await api(`/api/admin/chat/logs?${p}`);
+      setItems(j.logs);
+      setActions(j.actions || []);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="card">
+      {msg && <p className="error-box small">{msg}</p>}
+      <div className="row">
+        <input className="input" style={{ maxWidth: 180 }} placeholder={t('chStudent')} value={f.student} onChange={(e) => setF({ ...f, student: e.target.value })} />
+        <input className="input" style={{ maxWidth: 150 }} type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
+        <input className="input" style={{ maxWidth: 160 }} placeholder={t('chWord')} value={f.word} onChange={(e) => setF({ ...f, word: e.target.value })} dir="auto" />
+        <select className="select" style={{ maxWidth: 180 }} value={f.action} onChange={(e) => setF({ ...f, action: e.target.value })}>
+          <option value="">{t('chAll')} {t('chAction')}</option>
+          {actions.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <button className="btn btn-sm btn-primary" onClick={load}>{t('lgFilter')}</button>
+      </div>
+      <div className="table-wrap mt">
+        <table className="tbl">
+          <thead><tr><th>{t('chDate')}</th><th>{t('chStudent')}</th><th>{t('chAction')}</th><th>{t('chRule')}</th><th>{t('chViolations')}</th></tr></thead>
+          <tbody>
+            {items.map((l) => (
+              <tr key={String(l.id)}>
+                <td className="small">{String(l.createdAt).slice(0, 19).replace('T', ' ')}</td>
+                <td className="small">{l.username ? `@${String(l.username)} (${String(l.displayName || '')})` : String(l.userId).slice(0, 8)}</td>
+                <td className="small"><b>{String(l.action)}</b></td>
+                <td className="small" dir="auto">{String(l.ruleWord || l.ruleId || '—').slice(0, 60)}</td>
+                <td className="small" dir="auto">{String(l.matchedWord || l.details || '').slice(0, 80)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ChatSettings() {
+  const { t } = useT();
+  const [s, setS] = useState<Record<string, string | boolean | number>>({});
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    api('/api/admin/settings').then((j) => setS(j.settings)).catch(() => {});
+  }, []);
+
+  async function save() {
+    try {
+      const j = await api('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatEnabled: !!s.chatEnabled,
+          chatStudentChat: !!s.chatStudentChat,
+          chatTeacherChat: !!s.chatTeacherChat,
+          chatMaxLength: Number(s.chatMaxLength) || 2000,
+          chatAttachments: !!s.chatAttachments,
+          chatMaxAttachmentMB: Number(s.chatMaxAttachmentMB) || 25,
+          chatModeration: !!s.chatModeration,
+          chatDefaultSuspensionMinutes: Number(s.chatDefaultSuspensionMinutes) || 10,
+          chatRateMax: Number(s.chatRateMax) || 20,
+          chatRateWindowMinutes: Number(s.chatRateWindowMinutes) || 1,
+          chatShowOnline: !!s.chatShowOnline,
+          chatShowLastSeen: !!s.chatShowLastSeen,
+          chatBrowserNotify: !!s.chatBrowserNotify,
+        }),
+      });
+      setS(j.settings);
+      setMsg(t('saved'));
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  const bool = (k: string) => (
+    <select className="select" value={String(!!s[k])} onChange={(e) => setS({ ...s, [k]: e.target.value === 'true' })}>
+      <option value="true">{t('seOn')}</option>
+      <option value="false">{t('seOff')}</option>
+    </select>
+  );
+  const num = (k: string) => (
+    <input className="input" type="number" value={String(s[k] ?? '')} onChange={(e) => setS({ ...s, [k]: Number(e.target.value) })} dir="ltr" />
+  );
+
+  return (
+    <div className="grid">
+      {msg && <div className="card"><span className="small">{msg}</span></div>}
+      <div className="card">
+        <h3>{t('chSeGeneral')}</h3>
+        <label className="lbl">{t('chEnableChat')}</label>{bool('chatEnabled')}
+        <label className="lbl">{t('chStudentChat')}</label>{bool('chatStudentChat')}
+        <label className="lbl">{t('chTeacherChat')}</label>{bool('chatTeacherChat')}
+        <label className="lbl">{t('chMaxLen')}</label>{num('chatMaxLength')}
+        <label className="lbl">{t('chAllowAttach')}</label>{bool('chatAttachments')}
+        <label className="lbl">{t('chMaxAttach')}</label>{num('chatMaxAttachmentMB')}
+      </div>
+      <div className="card">
+        <h3>{t('chSeModeration')}</h3>
+        <label className="lbl">{t('chEnableMod')}</label>{bool('chatModeration')}
+        <label className="lbl">{t('chDefaultSusp')}</label>{num('chatDefaultSuspensionMinutes')}
+      </div>
+      <div className="card">
+        <h3>{t('chSeRate')}</h3>
+        <label className="lbl">{t('chRateMax')}</label>{num('chatRateMax')}
+        <label className="lbl">{t('chRateWindow')}</label>{num('chatRateWindowMinutes')}
+      </div>
+      <div className="card">
+        <h3>{t('chSePresence')}</h3>
+        <label className="lbl">{t('chShowOnline')}</label>{bool('chatShowOnline')}
+        <label className="lbl">{t('chShowLastSeen')}</label>{bool('chatShowLastSeen')}
+        <button className="btn btn-primary mt" onClick={save}>{t('seSave')}</button>
       </div>
     </div>
   );

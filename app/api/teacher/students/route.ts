@@ -29,6 +29,7 @@ export async function GET(req: Request) {
   }
   const students = db.prepare(
     `SELECT u.id, u.username, u.displayName, u.classId, c.name AS className, u.createdAt,
+      CASE WHEN COALESCE(u.avatarFile, '') = '' THEN 0 ELSE 1 END AS hasAvatar,
       (SELECT COUNT(*) FROM submissions s WHERE s.studentId = u.id AND s.teacherId = ?) AS submissionCount
      FROM users u LEFT JOIN classes c ON c.id = u.classId
      WHERE ${where.join(' AND ')} ORDER BY u.displayName LIMIT 500`
