@@ -6,6 +6,7 @@ import { Download, Eye, FileText, Image as ImageIcon, File as FileIcon, Search, 
 import { useT } from '@/lib/i18n';
 import { Loading } from '@/components/feedback';
 import { TeacherNav } from '@/components/TeacherNav';
+import { FileDropzone } from '@/components/FileDropzone';
 import { formatBytes } from '@/lib/validation';
 import { useConfirm, usePrompt } from '@/components/dialogs';
 
@@ -38,6 +39,8 @@ export default function TeacherFolderDetail({ params }: { params: { id: string }
   const [zipOpts, setZipOpts] = useState({ includeMessages: false, includeHistory: false, includeDates: true });
   const [showSettings, setShowSettings] = useState(false);
   const [msg, setMsg] = useState('');
+  const [attachments, setAttachments] = useState<{ id: string; originalName: string; mime: string; size: number }[]>([]);
+  const [attachBusy, setAttachBusy] = useState(false);
 
   async function load() {
     try {
@@ -57,6 +60,7 @@ export default function TeacherFolderDetail({ params }: { params: { id: string }
       setSubs(j.submissions || []);
       setMissing(j.missing || []);
       setProgress(j.progress || { submitted: 0, total: 0, percent: 0 });
+      setAttachments(j.attachments || []);
     } catch {
     } finally {
       setLoading(false);
@@ -67,13 +71,43 @@ export default function TeacherFolderDetail({ params }: { params: { id: string }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-
   async function search() {
     const p = new URLSearchParams({ q, status: statusF }).toString();
     const r = await fetch(`/api/teacher/folders/${id}/submissions?${p}`, { cache: 'no-store' });
     if (r.ok) {
       const j = await r.json();
       setSubs(j.submissions || []);
+    }
+  }
+
+  async function uploadAttachments(files: File[]) {
+    if (files.length === 0) return;
+    setAttachBusy(true);
+    try {
+      const fd = new FormData();
+      for (const f of files.slice(0, 10)) fd.append('files', f, f.name);
+      const r = await fetch(`/api/teacher/folders/${id}/files`, { method: 'POST', body: fd });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) setMsg(j.error ? te(j.error) : t('errFailed'));
+      else load();
+    } catch {
+      setMsg(t('errOffline'));
+    } finally {
+      setAttachBusy(false);
+    }
+  }
+
+  async function delAttachment(fileId: string, name: string) {
+    const ok = await askConfirm({ title: name, message: t('delFileMsg'), okLabel: t('del'), danger: true });
+    if (!ok) return;
+    try {
+      const r = await fetch(`/api/teacher/folders/${id}/files/${fileId}`, { method: 'DELETE' });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        setMsg(j.error ? te(j.error) : t('errFailed'));
+      } else load();
+    } catch {
+      setMsg(t('errOffline'));
     }
   }
 
@@ -215,6 +249,30 @@ export default function TeacherFolderDetail({ params }: { params: { id: string }
             </a>
           </p>
         )}
+      </div>
+
+      <div className="card mt">
+        <h3><FileText size={16} style={{ verticalAlign: -3 }} /> {t('tfAttachments')}</h3>
+        {attachBusy && <p className="small muted">{t('loading')}</p>}
+        <FileDropzone inputId={`folder-attach-${id}`} onPick={uploadAttachments} />
+        <div className="grid mt">
+          {attachments.length === 0 ? (
+            <p className="muted small">{t('tfNoAttach')}</p>
+          ) : (
+            attachments.map((f) => (
+              <div key={f.id} className="file-item">
+                {fileIcon(f.mime, f.originalName)}
+                <div className="grow">
+                  <div className="ellipsis"><b dir="auto">{f.originalName}</b></div>
+                  <div className="small muted">{formatBytes(f.size)} · {f.mime}</div>
+                </div>
+                <button className="btn btn-sm btn-ghost" onClick={() => delAttachment(f.id, f.originalName)} aria-label={t('del')}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       <div className="card mt">

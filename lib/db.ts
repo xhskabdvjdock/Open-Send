@@ -507,6 +507,21 @@ function migrate(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_libbook_classes ON library_book_classes(bookId, classId);
     `);
   } catch {}
+  // Teacher folder attachments (reference materials for students to download).
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS folder_attachments (
+        id TEXT PRIMARY KEY,
+        folderId TEXT NOT NULL REFERENCES submission_folders(id) ON DELETE CASCADE,
+        storedFile TEXT NOT NULL,
+        originalName TEXT NOT NULL,
+        mime TEXT NOT NULL DEFAULT 'application/octet-stream',
+        size INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_fattach_folder ON folder_attachments(folderId);
+    `);
+  } catch {}
 }
 
 async function seed(db: DatabaseSync): Promise<void> {
@@ -644,6 +659,12 @@ export interface SubmissionRow {
 }
 export interface SubmissionFileRow {
   id: string; submissionId: string; storedFile: string; originalName: string;
+  mime: string; size: number; createdAt: string;
+}
+
+// ---------- Teacher folder attachments ----------
+export interface FolderAttachmentRow {
+  id: string; folderId: string; storedFile: string; originalName: string;
   mime: string; size: number; createdAt: string;
 }
 

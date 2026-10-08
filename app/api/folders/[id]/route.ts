@@ -25,8 +25,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
      FROM submissions s WHERE s.folderId = ? AND s.studentId = ? ORDER BY s.submissionNumber ASC`
   ).all(params.id, sess.user.id);
   const open = isFolderOpenForSubmit(f as never);
+  const attachments = db.prepare('SELECT id, originalName, mime, size, createdAt FROM folder_attachments WHERE folderId = ? ORDER BY createdAt').all(params.id);
   return json({
     folder: { ...f, classes, effectiveStatus: folderEffectiveStatus(f as never), canSubmit: open.ok, closedReason: open.ok ? null : open.reason },
     mySubmissions: mySubs,
+    attachments,
   });
 }

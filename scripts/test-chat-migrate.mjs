@@ -27,7 +27,7 @@ const eq = (name, got, want) => {
 const tables = Object.fromEntries(
   db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => [r.name, true])
 );
-for (const t of ['conversations', 'conversation_participants', 'chat_messages', 'chat_banned_words', 'chat_suspensions', 'chat_moderation_events', 'chat_presence', 'chat_blocks', 'library_books', 'library_book_classes']) {
+for (const t of ['conversations', 'conversation_participants', 'chat_messages', 'chat_banned_words', 'chat_suspensions', 'chat_moderation_events', 'chat_presence', 'chat_blocks', 'library_books', 'library_book_classes', 'folder_attachments']) {
   eq('table ' + t, !!tables[t], true);
 }
 // old tables intact

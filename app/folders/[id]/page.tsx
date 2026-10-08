@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { X, File as FileIcon, Send, Download, Trash2 } from 'lucide-react';
+import { X, File as FileIcon, Send, Download, Trash2, Eye, FileText } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { Loading } from '@/components/feedback';
 import { FileDropzone } from '@/components/FileDropzone';
@@ -14,6 +14,7 @@ export default function StudentFolderDetail({ params }: { params: { id: string }
   const { t, te } = useT();
   const [folder, setFolder] = useState<Record<string, unknown> | null>(null);
   const [mySubs, setMySubs] = useState<Record<string, unknown>[]>([]);
+  const [materials, setMaterials] = useState<{ id: string; originalName: string; mime: string; size: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
   const [message, setMessage] = useState('');
@@ -47,6 +48,7 @@ export default function StudentFolderDetail({ params }: { params: { id: string }
       }
       setFolder(j.folder);
       setMySubs(j.mySubmissions || []);
+      setMaterials(j.attachments || []);
     } catch {
     } finally {
       setLoading(false);
@@ -176,6 +178,33 @@ export default function StudentFolderDetail({ params }: { params: { id: string }
         <button className="btn btn-primary btn-block mt" onClick={submit} disabled={busy || !canSubmit || files.length === 0}>
           {busy ? <span className="spinner" /> : <Send size={16} />} {t('submitToFolder')}
         </button>
+      </div>
+
+      <div className="card">
+        <h3><FileText size={17} style={{ verticalAlign: -3 }} /> {t('tfAttachments')}</h3>
+        {materials.length === 0 ? (
+          <p className="muted small">{t('tfNoAttach')}</p>
+        ) : (
+          <div className="grid">
+            {materials.map((f) => (
+              <div key={f.id} className="file-item">
+                <FileIcon size={18} />
+                <div className="grow">
+                  <div className="ellipsis"><b dir="auto">{f.originalName}</b></div>
+                  <div className="small muted">{formatBytes(f.size)} · {f.mime}</div>
+                </div>
+                {f.mime === 'application/pdf' && (
+                  <a className="btn btn-sm" href={`/api/folder-files/${f.id}/download`} target="_blank" rel="noopener">
+                    <Eye size={13} /> {t('view')}
+                  </a>
+                )}
+                <a className="btn btn-sm btn-primary" href={`/api/folder-files/${f.id}/download`}>
+                  <Download size={13} /> {t('download')}
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card">

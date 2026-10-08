@@ -41,7 +41,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       progress = { submitted: submittedIds.size, total: all.length, percent: all.length ? Math.round((submittedIds.size / all.length) * 100) : 0 };
     }
   } catch {}
-  return json({ folder: { ...f, effectiveStatus: folderEffectiveStatus(f as never) }, submissions, missing, progress });
+  const attachments = db.prepare('SELECT id, originalName, mime, size, createdAt FROM folder_attachments WHERE folderId = ? ORDER BY createdAt').all(params.id);
+  return json({ folder: { ...f, effectiveStatus: folderEffectiveStatus(f as never) }, submissions, missing, progress, attachments });
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -141,6 +142,16 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       for (const fl of files) {
         try {
           const p = path.join(storageSubdir('submissions'), fl.storedFile);
+          if (fs.existsSync(p)) fs.unlinkSync(p);
+        } catch {}
+      }
+    } catch {}
+    // Delete physical attachment files (rows cascade via FK)
+    try {
+      const afiles = db.prepare('SELECT storedFile FROM folder_attachments WHERE folderId = ?').all(params.id) as unknown as { storedFile: string }[];
+      for (const fl of afiles) {
+        try {
+          const p = path.join(storageSubdir('folders'), fl.storedFile);
           if (fs.existsSync(p)) fs.unlinkSync(p);
         } catch {}
       }
