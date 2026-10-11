@@ -41,7 +41,9 @@ export async function POST(req: Request) {
   }
   if (user.enabled !== 1) {
     audit('Failed Login', { actorType: 'student', actorId: user.id, actorName: user.username, details: 'disabled account', ip });
-    return err('This account is disabled. Please contact the administrator.', 403);
+    // Generic message on purpose: a distinct "disabled" reply would let
+    // attackers enumerate valid usernames (matters more once public).
+    return err('Invalid username or password.', 401);
   }
   const ok = await verifyPassword(password, user.passwordHash);
   // Maintenance mode still allows login attempt but blocks app; inform here.

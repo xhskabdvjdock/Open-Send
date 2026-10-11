@@ -117,6 +117,8 @@ npm run start
 | `http://<server-name>.local/webadmin` | لوحة الإدارة — **تُكتب يدوياً، لا يوجد لها رابط** |
 | `http://<server-name>.local/webadmin/network` | تشخيص الشبكة (IP، الاسم، mDNS، الجدار، الحالة) |
 
+> وصول عام اختياري عبر HTTPS (Cloudflare Tunnel، مجاني، بدون فتح بورتات): راجع `docs/cloudflare-tunnel.md` — الشبكة المحلية تعمل دائماً مع أو بدون النفق.
+
 > إذا كان البورت 80 مشغولاً ببرنامج آخر: `npm run start:3000` (والرابط يصبح `http://<server-ip>:3000`).
 
 ### بيانات الدخول الافتراضية (تُنشأ عند أول تشغيل)

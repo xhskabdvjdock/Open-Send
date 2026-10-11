@@ -24,6 +24,23 @@ async function resolveHostname(name: string): Promise<{ ok: boolean; address?: s
   }
 }
 
+/** Best-effort check: is a cloudflared process running on this machine?
+ *  Process presence only (Windows) — it does NOT prove the public URL is
+ *  reachable. Never throws. */
+function tunnelStatus(): 'Online' | 'Offline' | 'Unknown' {
+  if (process.platform !== 'win32') return 'Unknown';
+  try {
+    const out = execSync('tasklist /FI "IMAGENAME eq cloudflared.exe" /NH', {
+      timeout: 6000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).toString();
+    if (/cloudflared\.exe/i.test(out) && !/INFO:\s*No tasks/i.test(out)) return 'Online';
+    return 'Offline';
+  } catch {
+    return 'Unknown';
+  }
+}
+
 /** Best-effort firewall check (Windows only). Never throws, never requires admin to read. */
 function firewallStatus(port: number): { app: string; mdns: string } {
   if (process.platform !== 'win32') return { app: 'Unknown', mdns: 'Unknown' };
@@ -91,6 +108,19 @@ export async function GET(req: Request) {
       transport: 'SSE',
       stream: '/api/chat/stream',
     },
+    // Public access (admin-only): URL comes from env, never hardcoded.
+    // `tunnel` is process presence on THIS machine, not reachability proof.
+    public: (() => {
+      const raw = (process.env.OPEN_SEND_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+      const https = /^https:\/\//i.test(raw);
+      return {
+        url: raw,
+        configured: raw.length > 0,
+        tunnel: raw ? tunnelStatus() : 'Unknown',
+        https,
+        realtime: 'SSE over HTTPS (same port, no extra config)',
+      };
+    })(),
     warning: hasExpectedIp
       ? null
       : `Expected server IP ${expectedIp} not found on this machine. ${hostname} may not work correctly.`,

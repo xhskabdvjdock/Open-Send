@@ -25,6 +25,7 @@ type NetInfo = {
   server: string;
   warning: string | null;
   chat?: { enabled: boolean; transport: string; stream: string };
+  public?: { url: string; configured: boolean; tunnel: string; https: boolean; realtime: string };
 };
 
 async function api(path: string) {
@@ -145,6 +146,21 @@ export default function NetworkDiagnosticsPage() {
               ok={net.chat?.enabled === true}
               value={net.chat?.enabled ? `OK (${net.chat.transport}, ${net.chat.stream})` : 'Disabled'}
             />
+            <Row
+              label={t('netTunnel')}
+              ok={net.public?.configured ? (net.public.tunnel === 'Online' ? true : net.public.tunnel === 'Offline' ? false : null) : null}
+              value={
+                net.public?.configured
+                  ? `${net.public.tunnel} · ${net.public.url}`
+                  : t('netNotConfigured')
+              }
+            />
+            {net.public?.configured && (
+              <>
+                <Row label={t('netHttps')} ok={net.public.https ? true : false} value={net.public.https ? 'Active' : 'Inactive'} />
+                <Row label={t('netRealtime')} ok={true} value={String(net.public.realtime || '')} />
+              </>
+            )}
 
             <dl className="kv mt">
               <dt>{t('netExpectedIp')}</dt><dd dir="ltr">{net.expectedIp}</dd>
@@ -170,6 +186,19 @@ export default function NetworkDiagnosticsPage() {
               </ol>
               <p className="hint small">{t('syQrHint')}</p>
             </div>
+            {net.public?.configured && (
+              <div className="card mt">
+                <h3 style={{ marginTop: 0 }}>{t('netPublic')}</h3>
+                <p className="small" dir="ltr">
+                  <b>{net.public.url}</b>
+                </p>
+                <div className="qr-box mt">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/admin/qr?text=${encodeURIComponent(net.public.url)}`} alt="Public QR" width={180} height={180} />
+                </div>
+                <p className="hint small mt">{t('syQrHint')}</p>
+              </div>
+            )}
           </>
         )}
       </div>

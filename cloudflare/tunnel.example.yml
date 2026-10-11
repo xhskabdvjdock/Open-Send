@@ -1,0 +1,22 @@
+# Open Send - Cloudflare Tunnel config TEMPLATE (contains NO secrets).
+#
+# 1. Copy this file OUTSIDE git, e.g. to:
+#      %USERPROFILE%\.cloudflared\config-opensend.yml
+#    (that folder is created by `cloudflared tunnel login` and is never committed)
+# 2. Fill in: tunnel id, your credentials-file path, your public hostname.
+# 3. Point the Windows service at it (scripts/cloudflare-tunnel-service.bat).
+# Full guide: docs/cloudflare-tunnel.md
+#
+# For a Quick Tunnel (free temporary URL, no account) you need NO config file:
+#   cloudflared tunnel --url http://127.0.0.1:80
+
+tunnel: PASTE_TUNNEL_ID_HERE
+credentials-file: C:\Users\CHANGE_ME\.cloudflared\PASTE_TUNNEL_ID_HERE.json
+
+ingress:
+  # Public site -> local Open Send (port 80 = production, see package.json "start").
+  # SSE realtime (/api/chat/stream) needs no extra rule: it is plain HTTPS.
+  - hostname: YOUR_PUBLIC_HOSTNAME
+    service: http://127.0.0.1:80
+  # Anything else: closed with 404 (nothing else on this machine is exposed).
+  - service: http_status:404

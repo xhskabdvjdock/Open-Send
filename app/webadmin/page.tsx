@@ -1077,6 +1077,7 @@ function System() {
     detectedIps?: string[]; hasExpectedIp?: boolean;
     mdns?: string; mdnsResolvedIp?: string | null;
     firewall?: { app: string; mdns: string }; server?: string; warning?: string | null;
+    public?: { url: string; configured: boolean; tunnel: string; https: boolean; realtime: string };
   } | null>(null);
   const [backups, setBackups] = useState<{ name: string; size: number; createdAt: string }[]>([]);
   const [msg, setMsg] = useState('');
@@ -1209,6 +1210,7 @@ function NetworkPanel({ net, qrUrl, setQrUrl }: {
     detectedIps?: string[]; hasExpectedIp?: boolean;
     mdns?: string; mdnsResolvedIp?: string | null;
     firewall?: { app: string; mdns: string }; server?: string; warning?: string | null;
+    public?: { url: string; configured: boolean; tunnel: string; https: boolean; realtime: string };
   };
   qrUrl: string;
   setQrUrl: (u: string) => void;
@@ -1250,7 +1252,7 @@ function NetworkPanel({ net, qrUrl, setQrUrl }: {
     copyText(lines.join('\n'), t('netDiagCopied'));
   }
 
-  const qrOptions = [hostnameUrl, ipUrl, ...(net.lanUrls || [])].filter(
+  const qrOptions = [hostnameUrl, ipUrl, ...(net.public?.configured ? [net.public.url] : []), ...(net.lanUrls || [])].filter(
     (u, i, a) => u && a.indexOf(u) === i
   );
 
@@ -1261,6 +1263,12 @@ function NetworkPanel({ net, qrUrl, setQrUrl }: {
         <dd><span aria-hidden>●</span> {t('netOnline')}</dd>
         <dt>{t('netLocalAddress')}</dt>
         <dd><b dir="ltr">{hostnameUrl}</b></dd>
+        {net.public?.configured && (
+          <>
+            <dt>{t('netPublicUrl')}</dt>
+            <dd><b dir="ltr">{net.public.url}</b></dd>
+          </>
+        )}
         <dt>{t('netIpAddress')}</dt>
         <dd><span dir="ltr">{net.expectedIp || ''}</span></dd>
         <dt>{t('netPort')}</dt>

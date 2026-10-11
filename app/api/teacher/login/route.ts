@@ -37,7 +37,8 @@ export async function POST(req: Request) {
   }
   if (teacher.enabled !== 1) {
     audit('Failed Teacher Login', { actorType: 'teacher', actorId: teacher.id, actorName: teacher.username, details: 'disabled account', ip });
-    return err('This account is disabled. Please contact the administrator.', 403);
+    // Generic message on purpose (see student login): no username enumeration.
+    return err('Invalid username or password.', 401);
   }
   const ok = await verifyPassword(password, teacher.passwordHash);
   if (!ok) {
