@@ -19,10 +19,9 @@ School LAN — http://<local-hostname>
 Local access keeps working with or without the tunnel, with or without
 internet. Stopping the tunnel takes public access offline only.
 
-> Status in THIS project: the app is fully prepared (same-origin code, hardened
-> headers, sanitized health endpoint, admin diagnostics). Creating the actual
-> tunnel (account login) is a manual step for the school admin — see Step 2.
-> Until then the admin panel shows Public as **Not configured yet**.
+> Fresh installs show Public as **Not configured yet** in the admin panel until
+> `OPEN_SEND_PUBLIC_URL` is set (Step 2). Creating the actual tunnel (account
+> login) is a manual step for the school admin — see below.
 
 ---
 
@@ -189,8 +188,8 @@ With mobile data (NOT school Wi-Fi), verify in order:
 
 ## Notes & limits (honest)
 
-- **No live tunnel exists yet** — account login must be done by the school
-  admin (see Step 2). Nothing here claims otherwise.
+- The tunnel itself is never created by code or scripts here — account login
+  must be done by the school admin (see Step 2). Nothing here claims otherwise.
 - Admin 2FA is **not implemented** (login stays username+password with
   rate limiting + audit). Optional extra layer: Cloudflare Access in front
   of `/webadmin` (free tier available) — intentionally not wired in.

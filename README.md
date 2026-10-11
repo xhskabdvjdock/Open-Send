@@ -137,6 +137,8 @@ npm run start
 | `npm run build` | بناء نسخة الإنتاج |
 | `npm run start` / `start:lan` | تشغيل الإنتاج على `0.0.0.0:80` (بدون بورت في الرابط) |
 | `npm run start:3000` | بديل الإنتاج على `:3000` إذا كان 80 مشغولاً |
+| `npm run tunnel:quick` | نفق Cloudflare مؤقت (رابط `https://...trycloudflare.com` للتجربة) |
+| `npm run tunnel:service` | تثبيت/إدارة النفق المسمّى كخدمة ويندوز (رابط دائم) |
 
 ---
 
@@ -401,13 +403,15 @@ open-send/
 │   └── api/                ← كل مسارات API (طالب + admin)
 ├── components/             ← Shell (التنقل)، FileDropzone (مربع الرفع الموحد)، StatusBadge، حالات التحميل/الفراغ
 ├── lib/                    ← db، auth، settings، transfers، i18n، theme، network (هوية الشبكة)، ...
-├── docs/                   ← local-network.md (دليل الشبكة المحلية)
-├── scripts/                ← mdns.mjs، network-check.mjs، btec-lan-setup.ps1، setup-btec-lan.bat، ...
+├── docs/                   ← local-network.md (دليل الشبكة المحلية)، cloudflare-tunnel.md (الوصول العام عبر HTTPS)
+├── cloudflare/             ← tunnel.example.yml (قالب إعداد النفق — بلا أسرار)
+├── scripts/                ← mdns.mjs، network-check.mjs، btec-lan-setup.ps1، setup-btec-lan.bat، cloudflare-setup.bat، cloudflare-tunnel-service.bat، ...
 ├── data/                   ← opensend.db (تُنشأ تلقائياً، لا تُرفع لـ git)
 ├── storage/                ← pending/ accepted/ completed/ rejected/ (محلية فقط)
 ├── backups/                ← النسخ الاحتياطية (محلية فقط)
 ├── public/fonts/           ← ضع هنا ملفات خط ثمانية
 ├── start-lan.bat / .sh     ← تشغيل الشبكة المحلية
+├── start-public.bat        ← نفق Cloudflare مؤقت (وصول عام للتجربة)
 └── README.md
 ```
 
@@ -437,12 +441,21 @@ open-send/
 - كتابة SQLite متزامنة — مناسبة لمئات المستخدمين المتزامنين، ليست لآلاف.
 - عنوان QR الافتراضي أول عنوان شبكة — اختر عنوان الواي فاي يدوياً من القائمة.
 - خطوط البديل تُحمَّل **أثناء البناء فقط** (تحتاج إنترنت لمرة واحدة) ثم تعمل دون إنترنت للأبد.
+- الوصول العام (Cloudflare Tunnel) طبقة اختيارية أمام نفس السيرفر — الشبكة المحلية تعمل دائماً معه أو بدونه.
+- دخول الإدارة باسم مستخدم وكلمة مرور فقط (بلا تحقق بخطوتين) مع تحديد معدل وتدقيق — للحماية الأعلى ضع Cloudflare Access أمام `/webadmin`.
 
 ---
 
 ## 19. سجل الإصدارات
 
-**v1.2.0** (الحالي)
+**v1.3.0** (الحالي)
+
+- وصول عام اختياري عبر HTTPS (Cloudflare Tunnel المجاني): نفق مؤقت للتجربة `start-public.bat`، ونفق مسمّى برابط دائم يُثبَّت كخدمة ويندوز — بلا VPS ولا فتح بورتات، والشبكة المحلية تعمل دائماً معه أو بدونه (التفاصيل: `docs/cloudflare-tunnel.md`).
+- الشات اللحظي (SSE) يعمل عبر النفق بنفس المنفذ دون أي إعداد إضافي.
+- تشديد أمني: ترويسات `nosniff`/`SAMEORIGIN`/`Referrer-Policy`/`Permissions-Policy`، و`/api/health` عامة بلا أي بيانات حساسة، ورسائل دخول موحدة تمنع تخمين الحسابات المعطلة.
+- قسم الوصول العام في `/webadmin/network` (حالة النفق، الرابط، HTTPS، اللحظي) مع QR للرابط العام عبر `OPEN_SEND_PUBLIC_URL`، وسطر الرابط العام في بطاقة النظام.
+
+**v1.2.0**
 
 - محادثات داخلية فورية بين الطلاب (SSE لحظي بدون إنترنت، حضور متصل/غير متصل وآخر ظهور، غير مقروء، حذف الرسائل، ترقيم صفحات).
 - مكتبة كتب مدرسية باستهداف صفّي ومفتاح تفعيل من الإدارة.

@@ -1,14 +1,16 @@
 {
   "name": "open-send",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
-  "description": "Open Send — local school file-sharing web app (Next.js + SQLite + local storage)",
+  "description": "Open Send — local-first school file-sharing web app (Next.js + SQLite + local storage, optional free Cloudflare Tunnel public HTTPS)",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
     "start": "node scripts/network-check.mjs && next start -H 0.0.0.0 -p 80",
     "start:lan": "node scripts/network-check.mjs && next start -H 0.0.0.0 -p 80",
     "start:3000": "node scripts/network-check.mjs --port=3000 && next start -H 0.0.0.0 -p 3000",
+    "tunnel:quick": "start-public.bat",
+    "tunnel:service": "scripts\\cloudflare-tunnel-service.bat",
     "network:check": "node scripts/network-check.mjs",
     "setup:lan": "node scripts/network-check.mjs",
     "lint": "next lint"
